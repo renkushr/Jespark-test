@@ -3,7 +3,9 @@
 <html lang="th">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5" />
+    <meta name="theme-color" content="#111811" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>Jespark Rewards</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@100..900&display=swap" rel="stylesheet" />
@@ -29,6 +31,8 @@
         body {
             font-family: 'Noto Sans Thai', sans-serif;
             -webkit-tap-highlight-color: transparent;
+            /* Safe area for notched phones (iOS/Android) */
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             /* Premium Mesh Background for outside the app */
             background-color: #f8faf8;
             background-image: 
@@ -99,6 +103,12 @@
 </head>
 <body class="text-dark-green">
     <div id="root"></div>
+    <noscript>
+        <div style="padding: 2rem; text-align: center; font-family: sans-serif;">
+            <p>Jespark Rewards ต้องเปิด JavaScript ในเบราว์เซอร์</p>
+            <p>กรุณาเปิดการตั้งค่า JavaScript แล้วรีเฟรชหน้า</p>
+        </div>
+    </noscript>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>

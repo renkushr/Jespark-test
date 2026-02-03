@@ -23,19 +23,42 @@ import AdminLogin from './screens/AdminLogin';
 import AdminDashboard from './screens/AdminDashboard';
 import Navbar from './components/Navbar';
 
+/** LIFF init timeout (ms) — บางเครื่องมือถือ/เบราว์เซอร์ LIFF ค้าง ให้โชว์แอปหลัง timeout */
+const LIFF_INIT_TIMEOUT_MS = 10000;
+
 /** Initialize LIFF once at app startup (when configured) so redirect from LINE login works */
-const useLiffReady = (): boolean => {
+const useLiffReady = (): { ready: boolean; liffFailed?: boolean } => {
   const [ready, setReady] = useState(!isLiffConfigured());
+  const [liffFailed, setLiffFailed] = useState(false);
 
   useEffect(() => {
     if (!isLiffConfigured()) {
       setReady(true);
       return;
     }
-    liffService.init().then(setReady);
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      if (cancelled) return;
+      setLiffFailed(true);
+      setReady(true);
+    }, LIFF_INIT_TIMEOUT_MS);
+    liffService.init()
+      .then((ok) => {
+        if (cancelled) return;
+        clearTimeout(timeoutId);
+        if (!ok) setLiffFailed(true);
+        setReady(true);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        clearTimeout(timeoutId);
+        setLiffFailed(true);
+        setReady(true);
+      });
+    return () => { cancelled = true; clearTimeout(timeoutId); };
   }, []);
 
-  return ready;
+  return { ready, liffFailed };
 };
 
 const AppRoutes: React.FC = () => {
@@ -89,11 +112,11 @@ const AppRoutes: React.FC = () => {
 };
 
 const App: React.FC = () => {
-  const liffReady = useLiffReady();
+  const { ready: liffReady, liffFailed } = useLiffReady();
 
   if (!liffReady) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-white text-dark-green font-sans">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-white text-dark-green font-sans px-6">
         <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
         <p className="mt-4 text-sm font-bold text-gray-500">กำลังเชื่อมต่อ LINE...</p>
       </div>
@@ -102,6 +125,11 @@ const App: React.FC = () => {
 
   return (
     <Router>
+      {liffFailed && (
+        <div className="fixed top-0 left-0 right-0 z-50 bg-amber-100 border-b border-amber-300 px-4 py-2 text-center text-sm text-amber-900">
+          ถ้าเข้าสู่ระบบไม่ได้ ลองเปิดลิงก์ในเบราว์เซอร์มือถือ (Chrome/Safari) แทนการเปิดในแชท LINE
+        </div>
+      )}
       <AuthProvider>
         <AppRoutes />
       </AuthProvider>
