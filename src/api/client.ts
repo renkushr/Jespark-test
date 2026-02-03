@@ -31,8 +31,10 @@ class ApiClient {
       ...options.headers,
     };
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    // ใช้ token จาก memory หรือจาก localStorage (ป้องกันกรณีโหลดหน้าใหม่/race)
+    const token = this.token ?? (typeof localStorage !== 'undefined' ? localStorage.getItem('auth_token') : null);
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
     let response: Response;
@@ -57,7 +59,15 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      throw new Error(data.error || 'An error occurred');
+      if (response.status === 401) {
+        const detail = data?.detail || data?.error || '';
+        if (detail.includes('Access token required') || detail.includes('Unauthorized')) {
+          this.clearToken();
+          throw new Error('Session expired or not logged in. Please log in again.');
+        }
+        throw new Error(data?.error || 'Unauthorized');
+      }
+      throw new Error(data?.error || 'An error occurred');
     }
 
     return data;

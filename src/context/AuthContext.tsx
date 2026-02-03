@@ -67,7 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const lineLogin = async (lineId: string, name: string, email?: string, pictureUrl?: string) => {
     const response = await apiClient.lineLogin(lineId, name, email, pictureUrl);
-    apiClient.setToken(response.token);
+    const token = response?.token;
+    if (!token) {
+      console.error('LINE login: no token in response', response);
+      throw new Error('เข้าสู่ระบบไม่สำเร็จ — ไม่ได้รับ token');
+    }
+    apiClient.setToken(token);
     setUser({
       name: response.user.name,
       tier: response.user.tier,
