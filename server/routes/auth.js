@@ -128,24 +128,37 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       return res.status(400).json({ error: 'LINE ID and name are required' });
     }
 
+    if (!process.env.JWT_SECRET) {
+      console.error('LINE login: JWT_SECRET is not set');
+      return res.status(500).json({ error: 'Server configuration error' });
+    }
+
     // Find user by LINE ID
-    let { data: user } = await supabase
+    let { data: user, error: findError } = await supabase
       .from('users')
       .select('*')
       .eq('line_id', lineId)
       .single();
+
+    if (findError && findError.code !== 'PGRST116') {
+      console.error('LINE login find user error:', findError);
+      return res.status(500).json({
+        error: process.env.NODE_ENV === 'development' ? findError.message : 'Database error',
+      });
+    }
 
     if (!user) {
       // สร้าง user ใหม่จากข้อมูล LINE profile
       const memberSince = new Date().getFullYear().toString();
       const avatar = pictureUrl || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&size=200&background=13ec13&color=111811';
       const defaultPassword = await bcrypt.hash('line_' + lineId, 10);
+      const lineEmail = email || `line_${lineId}@jespark.com`;
 
       const { data: newUser, error: insertError } = await supabase
         .from('users')
         .insert({
           line_id: lineId,
-          email: email || `line_${lineId}@jespark.com`,
+          email: lineEmail,
           password: defaultPassword,
           name,
           member_since: memberSince,
@@ -157,7 +170,14 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
         .select()
         .single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('LINE login insert error:', insertError);
+        return res.status(500).json({
+          error: process.env.NODE_ENV === 'development'
+            ? (insertError.message || JSON.stringify(insertError))
+            : 'Cannot create account. Please try again.',
+        });
+      }
       user = newUser;
     } else {
       // อัปเดตข้อมูล profile จาก LINE (ถ้ามีการเปลี่ยนแปลง)
@@ -174,7 +194,12 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
           .select()
           .single();
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error('LINE login update error:', updateError);
+          return res.status(500).json({
+            error: process.env.NODE_ENV === 'development' ? updateError.message : 'Database error',
+          });
+        }
         user = updatedUser;
       }
     }
@@ -201,7 +226,7 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
     });
   } catch (error) {
     console.error('LINE login error:', error);
-    const message = process.env.NODE_ENV === 'development' && error.message
+    const message = process.env.NODE_ENV === 'development' && error?.message
       ? error.message
       : 'Internal server error';
     res.status(500).json({ error: message });
