@@ -122,10 +122,11 @@ router.post('/login', authLimiter, loginValidator, async (req, res) => {
 // LINE Login
 router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => {
   try {
-    const { lineId, name, email, pictureUrl, statusMessage } = req.body;
+    const { lineId, email, pictureUrl, statusMessage } = req.body;
+    const name = (req.body.name || '').trim() || 'LINE User';
 
-    if (!lineId || !name) {
-      return res.status(400).json({ error: 'LINE ID and name are required' });
+    if (!lineId) {
+      return res.status(400).json({ error: 'LINE ID is required' });
     }
 
     if (!process.env.JWT_SECRET) {

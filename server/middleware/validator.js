@@ -4,9 +4,11 @@ import { body, param, query, validationResult } from 'express-validator';
 export const validate = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const arr = errors.array();
+    const firstMsg = arr[0]?.msg || 'Validation failed';
     return res.status(400).json({ 
-      error: 'Validation failed',
-      details: errors.array() 
+      error: firstMsg,
+      details: arr
     });
   }
   next();
@@ -45,11 +47,12 @@ export const lineLoginValidator = [
     .notEmpty()
     .withMessage('LINE ID is required'),
   body('name')
+    .optional({ values: 'falsy' })
     .trim()
-    .isLength({ min: 2, max: 100 })
-    .withMessage('Name must be between 2 and 100 characters'),
+    .isLength({ max: 100 })
+    .withMessage('Name must be at most 100 characters'),
   body('email')
-    .optional()
+    .optional({ values: 'falsy' })
     .isEmail()
     .normalizeEmail()
     .withMessage('Invalid email address'),
