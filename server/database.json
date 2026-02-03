@@ -1,0 +1,173 @@
+{
+  "users": [
+    {
+      "line_id": "line_1769967872819",
+      "email": "line_line_1769967872819@jespark.com",
+      "password": "$2b$10$xk.1vkdginWs9cIx5LVWsuDeyZJJZeG/6k6EhtLZMHLjrWXJQXNFy",
+      "name": "LINE User",
+      "member_since": "2026",
+      "avatar": "https://ui-avatars.com/api/?name=LINE%20User&size=200&background=13ec13&color=111811",
+      "tier": "Member",
+      "points": 0,
+      "wallet_balance": 0,
+      "id": 1,
+      "created_at": "2026-02-01T17:44:32.995Z",
+      "updated_at": "2026-02-01T17:44:32.995Z"
+    }
+  ],
+  "rewards": [
+    {
+      "id": 1,
+      "title": "ชุดคอมโบมื้อเช้า",
+      "description": "ใช้ได้ถึง 24 ต.ค. นี้",
+      "points": 850,
+      "category": "อาหาร",
+      "image": "https://lh3.googleusercontent.com/aida-public/AB6AXuCV9q2NoqqZX0evj0zH1KwEk7vbHLRBfpXygNxZNYqpPJFAVanCqQY7-SbaBvjNLJKg3_C5FZAD48YgnfQzJXHkr8bIlwcWecIq2lfyNDuvk_awWPSuP12nn95qjQVvRTWUY6UlcJAPAg8fTGgszNZb2wCAQp1txivHmsSx-QXpaVkNLT4O_FBa8DkySa6CnkiO85jKVx60cifkJON0XRsT4mRHhJYMR5RPvhs68e5bTb1bTJ0xW5CyCc7J54F8-ewlbNqhcwktbA6i",
+      "is_popular": true,
+      "is_limited": false,
+      "stock": 50
+    },
+    {
+      "id": 2,
+      "title": "เซตสกินแคร์หน้าใส",
+      "description": "รางวัลพิเศษจำนวนจำกัด",
+      "points": 3200,
+      "category": "ไลฟ์สไตล์",
+      "image": "https://lh3.googleusercontent.com/aida-public/AB6AXuCCz65zieJQ-LhzUPxDKQG0X1zH1PxrGMiitqicShaoS8Twu27cSWlNTcBav9tz_sDnfR7dr7XwnLouZgTES1-5BaR0RnLgW5f9MbbmH0EUunt5-Joj9-OG3h5z5pglomgW1JjXScc5ZVskbbTM9oqghqpFaavWXBcZEk8deF_gUGPb_QpRkCmBJmKU5rPgmzRSZ2ooakYMYWbhI-iX5DcQ0mCtvZ15D6Wdttmyk2F5wI_vZS_rLbP7FuLcLYIZFiuA-GUS7go8ZI-G",
+      "is_popular": true,
+      "is_limited": true,
+      "stock": 20
+    },
+    {
+      "id": 3,
+      "title": "กาแฟฟรี 10 แก้ว",
+      "description": "ใช้ได้ที่ร้านในเครือทุกสาขา",
+      "points": 1500,
+      "category": "เครื่องดื่ม",
+      "image": "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800",
+      "is_popular": true,
+      "is_limited": false,
+      "stock": -1
+    },
+    {
+      "id": 4,
+      "title": "บัตรกำนัล 500 บาท",
+      "description": "ใช้ซื้อสินค้าทุกประเภท",
+      "points": 2000,
+      "category": "บัตรกำนัล",
+      "image": "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?auto=format&fit=crop&q=80&w=800",
+      "is_popular": false,
+      "is_limited": false,
+      "stock": -1
+    },
+    {
+      "id": 5,
+      "title": "หูฟังบลูทูธ Premium",
+      "description": "คุณภาพเสียงระดับ Hi-Fi",
+      "points": 5000,
+      "category": "อิเล็กทรอนิกส์",
+      "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800",
+      "is_popular": true,
+      "is_limited": true,
+      "stock": 15
+    },
+    {
+      "id": 6,
+      "title": "เสื้อยืดแบรนด์เนม",
+      "description": "Limited Edition Collection",
+      "points": 2500,
+      "category": "แฟชั่น",
+      "image": "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=800",
+      "is_popular": false,
+      "is_limited": true,
+      "stock": 30
+    },
+    {
+      "id": 7,
+      "title": "บัตรชมภาพยนตร์ 2 ที่นั่ง",
+      "description": "ใช้ได้ทุกโรงในเครือ",
+      "points": 1200,
+      "category": "บันเทิง",
+      "image": "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?auto=format&fit=crop&q=80&w=800",
+      "is_popular": true,
+      "is_limited": false,
+      "stock": -1
+    },
+    {
+      "id": 8,
+      "title": "ชุดอาหารญี่ปุ่น",
+      "description": "เซตสุดคุ้มสำหรับ 2 ท่าน",
+      "points": 1800,
+      "category": "อาหาร",
+      "image": "https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?auto=format&fit=crop&q=80&w=800",
+      "is_popular": false,
+      "is_limited": false,
+      "stock": -1
+    }
+  ],
+  "transactions": [],
+  "redemptions": [],
+  "notifications": [],
+  "coupons": [],
+  "stores": [
+    {
+      "id": 1,
+      "name": "Jespark Central World",
+      "address": "999/9 ถนนพระราม 1 ปทุมวัน กรุงเทพฯ",
+      "phone": "02-123-4567",
+      "latitude": 13.7467,
+      "longitude": 100.5398,
+      "opening_hours": "10:00-22:00",
+      "image": "https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&q=80&w=800"
+    },
+    {
+      "id": 2,
+      "name": "Jespark Siam Paragon",
+      "address": "991 ถนนพระราม 1 ปทุมวัน กรุงเทพฯ",
+      "phone": "02-234-5678",
+      "latitude": 13.7465,
+      "longitude": 100.5347,
+      "opening_hours": "10:00-22:00",
+      "image": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&q=80&w=800"
+    },
+    {
+      "id": 3,
+      "name": "Jespark EmQuartier",
+      "address": "693 ถนนสุขุมวิท คลองตันเหนือ กรุงเทพฯ",
+      "phone": "02-345-6789",
+      "latitude": 13.7308,
+      "longitude": 100.5698,
+      "opening_hours": "10:00-22:00",
+      "image": "https://images.unsplash.com/photo-1567958451986-2de427a4a0be?auto=format&fit=crop&q=80&w=800"
+    },
+    {
+      "id": 4,
+      "name": "Jespark IconSiam",
+      "address": "299 ถนนเจริญนคร คลองต้นไทร กรุงเทพฯ",
+      "phone": "02-456-7890",
+      "latitude": 13.7268,
+      "longitude": 100.5101,
+      "opening_hours": "10:00-22:00",
+      "image": "https://images.unsplash.com/photo-1519567241046-7f570eee3ce6?auto=format&fit=crop&q=80&w=800"
+    },
+    {
+      "id": 5,
+      "name": "Jespark MBK Center",
+      "address": "444 ถนนพญาไท ปทุมวัน กรุงเทพฯ",
+      "phone": "02-567-8901",
+      "latitude": 13.7446,
+      "longitude": 100.53,
+      "opening_hours": "10:00-21:00",
+      "image": "https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?auto=format&fit=crop&q=80&w=800"
+    }
+  ],
+  "_nextId": {
+    "users": 2,
+    "rewards": 9,
+    "transactions": 1,
+    "redemptions": 1,
+    "notifications": 1,
+    "coupons": 1,
+    "stores": 6
+  }
+}
