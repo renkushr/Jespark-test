@@ -1,0 +1,8 @@
+{
+  "name": "Jespark Rewards & Lifestyle",
+  "description": "A comprehensive loyalty and rewards application featuring point management, digital wallet, store finder, and exclusive member deals.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}

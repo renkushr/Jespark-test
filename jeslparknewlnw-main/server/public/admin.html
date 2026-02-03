@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jespark Admin Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .gradient-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .gradient-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        .gradient-warning {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        }
+        .gradient-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        .sidebar-active {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.1) 0%, transparent 100%);
+            border-left: 4px solid #667eea;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.95) 100%);
+            backdrop-filter: blur(10px);
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 min-h-screen">
+    <!-- Mobile Menu Button -->
+    <button id="mobileMenuBtn" class="lg:hidden fixed top-4 left-4 z-50 bg-purple-600 text-white p-3 rounded-xl shadow-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+        </svg>
+    </button>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-white shadow-2xl flex flex-col fixed lg:relative h-full z-40 transform -translate-x-full lg:translate-x-0 transition-transform duration-300">
+            <!-- Logo -->
+            <div class="gradient-primary p-6">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-white/20 backdrop-blur-sm rounded-xl p-2">
+                        <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-black text-white">Jespark Admin</h1>
+                        <p class="text-white/70 text-xs">Management System</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation -->
+            <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+                <a href="#dashboard" onclick="showSection('dashboard', event)" class="sidebar-item sidebar-active flex items-center space-x-3 px-4 py-3 rounded-xl transition-all">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                    </svg>
+                    <span class="font-semibold text-gray-700">Dashboard</span>
+                </a>
+                <a href="#users" onclick="showSection('users', event)" class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                    </svg>
+                    <span class="font-semibold text-gray-600">Users</span>
+                </a>
+                <a href="#rewards" onclick="showSection('rewards', event)" class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path>
+                    </svg>
+                    <span class="font-semibold text-gray-600">Rewards</span>
+                </a>
+                <a href="#transactions" onclick="showSection('transactions', event)" class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    <span class="font-semibold text-gray-600">Transactions</span>
+                </a>
+                <a href="#analytics" onclick="showSection('analytics', event)" class="sidebar-item flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-all">
+                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                    </svg>
+                    <span class="font-semibold text-gray-600">Analytics</span>
+                </a>
+            </nav>
+
+            <!-- User Info -->
+            <div class="p-4 border-t border-gray-100">
+                <div class="flex items-center space-x-3 px-4 py-3 bg-gray-50 rounded-xl">
+                    <div class="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <span class="text-white font-bold text-sm">AD</span>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold text-gray-800 text-sm">Admin</p>
+                        <p class="text-xs text-gray-500">admin@jespark.com</p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto w-full lg:w-auto">
+            <!-- Header -->
+            <header class="bg-white shadow-sm sticky top-0 z-10">
+                <div class="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+                    <div class="ml-12 lg:ml-0">
+                        <h2 class="text-xl sm:text-2xl font-bold text-gray-800" id="pageTitle">Dashboard</h2>
+                        <p class="text-xs sm:text-sm text-gray-500 hidden sm:block" id="pageSubtitle">ภาพรวมระบบ Jespark Rewards</p>
+                    </div>
+                    <div class="flex items-center space-x-2 sm:space-x-4">
+                        <div class="relative hidden md:block">
+                            <input type="text" placeholder="ค้นหา..." class="pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm">
+                            <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+                        <button class="relative p-2 text-gray-400 hover:text-gray-600 transition">
+                            <svg class="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full pulse-dot"></span>
+                        </button>
+                        <div class="text-xs sm:text-sm text-gray-600 hidden sm:block" id="currentTime"></div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <div id="dashboardSection" class="p-4 sm:p-6 lg:p-8">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                    <!-- Total Users -->
+                    <div class="stat-card rounded-xl sm:rounded-2xl p-4 sm:p-6 card-hover border border-gray-100">
+                        <div class="flex items-center justify-between mb-3 sm:mb-4">
+                            <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+12%</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-500 font-medium mb-1">Total Users</p>
+                        <p class="text-2xl sm:text-3xl font-black text-gray-800" id="totalUsers">-</p>
+                    </div>
+
+                    <!-- Total Points -->
+                    <div class="stat-card rounded-xl sm:rounded-2xl p-4 sm:p-6 card-hover border border-gray-100">
+                        <div class="flex items-center justify-between mb-3 sm:mb-4">
+                            <div class="bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">+8%</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-500 font-medium mb-1">Total Points</p>
+                        <p class="text-2xl sm:text-3xl font-black text-gray-800" id="totalPoints">-</p>
+                    </div>
+
+                    <!-- Total Revenue -->
+                    <div class="stat-card rounded-xl sm:rounded-2xl p-4 sm:p-6 card-hover border border-gray-100">
+                        <div class="flex items-center justify-between mb-3 sm:mb-4">
+                            <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-semibold text-green-600 bg-green-50 px-2 py-1 rounded-full">+24%</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-500 font-medium mb-1">Total Revenue</p>
+                        <p class="text-2xl sm:text-3xl font-black text-gray-800" id="totalRevenue">-</p>
+                    </div>
+
+                    <!-- Active Rewards -->
+                    <div class="stat-card rounded-xl sm:rounded-2xl p-4 sm:p-6 card-hover border border-gray-100">
+                        <div class="flex items-center justify-between mb-3 sm:mb-4">
+                            <div class="bg-gradient-to-br from-purple-500 to-pink-600 rounded-lg sm:rounded-xl p-2 sm:p-3">
+                                <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"></path>
+                                </svg>
+                            </div>
+                            <span class="text-xs font-semibold text-purple-600 bg-purple-50 px-2 py-1 rounded-full">Active</span>
+                        </div>
+                        <p class="text-xs sm:text-sm text-gray-500 font-medium mb-1">Active Rewards</p>
+                        <p class="text-2xl sm:text-3xl font-black text-gray-800" id="activeRewards">-</p>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                    <!-- Revenue Chart -->
+                    <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                        <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">Revenue Overview</h3>
+                        <div class="relative" style="height: 300px;">
+                            <canvas id="revenueChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Users Chart -->
+                    <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                        <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">User Growth</h3>
+                        <div class="relative" style="height: 300px;">
+                            <canvas id="usersChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">Recent Transactions</h3>
+                    <div class="overflow-x-auto -mx-4 sm:mx-0">
+                        <table class="w-full min-w-[600px]">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600">User</th>
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600">Type</th>
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600">Amount</th>
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600">Points</th>
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600 hidden md:table-cell">Date</th>
+                                    <th class="text-left py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-600">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTransactions">
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-gray-400">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Section (Hidden by default) -->
+            <div id="usersSection" class="p-4 sm:p-6 lg:p-8 hidden">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">All Users</h3>
+                    <div id="usersList">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Rewards Section (Hidden by default) -->
+            <div id="rewardsSection" class="p-4 sm:p-6 lg:p-8 hidden">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">All Rewards</h3>
+                    <div id="rewardsList">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Transactions Section (Hidden by default) -->
+            <div id="transactionsSection" class="p-4 sm:p-6 lg:p-8 hidden">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">All Transactions</h3>
+                    <div id="transactionsList">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Analytics Section (Hidden by default) -->
+            <div id="analyticsSection" class="p-4 sm:p-6 lg:p-8 hidden">
+                <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-lg border border-gray-100">
+                    <h3 class="text-base sm:text-lg font-bold text-gray-800 mb-3 sm:mb-4">Analytics & Reports</h3>
+                    <p class="text-gray-600">Coming soon...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        // Mobile menu toggle
+        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+        const sidebar = document.getElementById('sidebar');
+        
+        mobileMenuBtn.addEventListener('click', () => {
+            sidebar.classList.toggle('-translate-x-full');
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth < 1024) {
+                if (!sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+                    sidebar.classList.add('-translate-x-full');
+                }
+            }
+        });
+
+        // Update time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('currentTime').textContent = now.toLocaleString('th-TH', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // Show section
+        function showSection(section, event) {
+            // Prevent default link behavior
+            if (event) {
+                event.preventDefault();
+            }
+            
+            // Hide all sections
+            document.querySelectorAll('[id$="Section"]').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected section
+            document.getElementById(section + 'Section').classList.remove('hidden');
+            
+            // Update sidebar active state
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('sidebar-active');
+            });
+            
+            // Add active class to clicked item
+            if (event) {
+                const clickedItem = event.target.closest('.sidebar-item');
+                if (clickedItem) {
+                    clickedItem.classList.add('sidebar-active');
+                }
+            }
+            
+            // Close sidebar on mobile
+            if (window.innerWidth < 1024) {
+                sidebar.classList.add('-translate-x-full');
+            }
+            
+            // Update page title
+            const titles = {
+                'dashboard': ['Dashboard', 'ภาพรวมระบบ Jespark Rewards'],
+                'users': ['Users Management', 'จัดการข้อมูลผู้ใช้'],
+                'rewards': ['Rewards Management', 'จัดการของรางวัล'],
+                'transactions': ['Transactions', 'ประวัติการทำธุรกรรม'],
+                'analytics': ['Analytics', 'รายงานและสถิติ']
+            };
+            document.getElementById('pageTitle').textContent = titles[section][0];
+            document.getElementById('pageSubtitle').textContent = titles[section][1];
+
+            // Load data for specific sections
+            if (section === 'users') {
+                loadUsers();
+            } else if (section === 'rewards') {
+                loadRewards();
+            } else if (section === 'transactions') {
+                loadTransactions();
+            }
+        }
+
+        // Load dashboard stats
+        async function loadDashboardStats() {
+            try {
+                // Load admin stats
+                const statsRes = await fetch(`${API_BASE}/admin/stats`);
+                if (statsRes.ok) {
+                    const stats = await statsRes.json();
+                    document.getElementById('totalUsers').textContent = stats.totalUsers.toLocaleString();
+                    document.getElementById('totalPoints').textContent = stats.totalPoints.toLocaleString();
+                    document.getElementById('totalRevenue').textContent = '฿' + stats.totalRevenue.toLocaleString('th-TH', {minimumFractionDigits: 2});
+                    document.getElementById('activeRewards').textContent = stats.activeRewards.toLocaleString();
+                }
+
+                // Load recent transactions
+                loadRecentTransactions();
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+                document.getElementById('totalUsers').textContent = '0';
+                document.getElementById('totalPoints').textContent = '0';
+                document.getElementById('totalRevenue').textContent = '฿0.00';
+                document.getElementById('activeRewards').textContent = '0';
+            }
+        }
+
+        // Load recent transactions
+        async function loadRecentTransactions() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions/recent?limit=10`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const tbody = document.getElementById('recentTransactions');
+                    
+                    if (data.transactions.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No transactions yet</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = data.transactions.map(t => `
+                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                            <td class="py-3 px-2 sm:px-4 text-xs sm:text-sm">
+                                <div class="font-semibold text-gray-800">${t.customerName}</div>
+                                <div class="text-gray-500 text-xs">${t.customerEmail}</div>
+                            </td>
+                            <td class="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-600">Purchase</td>
+                            <td class="py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-gray-800">฿${parseFloat(t.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                            <td class="py-3 px-2 sm:px-4 text-xs sm:text-sm font-semibold text-green-600">+${t.points}</td>
+                            <td class="py-3 px-2 sm:px-4 text-xs sm:text-sm text-gray-500 hidden md:table-cell">${new Date(t.createdAt).toLocaleDateString('th-TH')}</td>
+                            <td class="py-3 px-2 sm:px-4">
+                                <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Completed</span>
+                            </td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load transactions:', error);
+            }
+        }
+
+        // Initialize charts
+        async function initCharts() {
+            try {
+                // Load revenue data
+                const revenueRes = await fetch(`${API_BASE}/admin/analytics/revenue`);
+                const revenueData = revenueRes.ok ? await revenueRes.json() : { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], data: [0, 0, 0, 0, 0, 0] };
+
+                // Load users data
+                const usersRes = await fetch(`${API_BASE}/admin/analytics/users`);
+                const usersData = usersRes.ok ? await usersRes.json() : { labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'], data: [0, 0, 0, 0, 0, 0] };
+
+                // Revenue Chart
+                const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+                new Chart(revenueCtx, {
+                    type: 'line',
+                    data: {
+                        labels: revenueData.labels,
+                        datasets: [{
+                            label: 'Revenue (฿)',
+                            data: revenueData.data,
+                            borderColor: 'rgb(102, 126, 234)',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                padding: 12,
+                                cornerRadius: 8,
+                                callbacks: {
+                                    label: function(context) {
+                                        return 'Revenue: ฿' + context.parsed.y.toLocaleString('th-TH', {minimumFractionDigits: 2});
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return '฿' + value.toLocaleString();
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Users Chart
+                const usersCtx = document.getElementById('usersChart').getContext('2d');
+                new Chart(usersCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: usersData.labels,
+                        datasets: [{
+                            label: 'New Users',
+                            data: usersData.data,
+                            backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                            borderRadius: 8,
+                            barThickness: 40
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                padding: 12,
+                                cornerRadius: 8
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(0, 0, 0, 0.05)'
+                                },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                console.error('Failed to load chart data:', error);
+            }
+        }
+
+        // Load users list
+        async function loadUsers() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/users?page=1&limit=20`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const container = document.getElementById('usersList');
+                    
+                    if (data.users.length === 0) {
+                        container.innerHTML = '<p class="text-gray-400 text-center py-8">No users found</p>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Name</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Email</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Tier</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Points</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Balance</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Joined</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.users.map(u => `
+                                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                            <td class="py-3 px-4 text-sm font-semibold text-gray-800">${u.name}</td>
+                                            <td class="py-3 px-4 text-sm text-gray-600">${u.email}</td>
+                                            <td class="py-3 px-4">
+                                                <span class="inline-block px-2 py-1 text-xs font-semibold rounded-full ${
+                                                    u.tier === 'Gold' ? 'bg-yellow-100 text-yellow-800' :
+                                                    u.tier === 'Silver' ? 'bg-gray-100 text-gray-800' :
+                                                    'bg-orange-100 text-orange-800'
+                                                }">${u.tier}</span>
+                                            </td>
+                                            <td class="py-3 px-4 text-sm font-semibold text-green-600">${u.points.toLocaleString()}</td>
+                                            <td class="py-3 px-4 text-sm font-semibold text-blue-600">฿${u.walletBalance.toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                                            <td class="py-3 px-4 text-sm text-gray-500">${new Date(u.createdAt).toLocaleDateString('th-TH')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-600">
+                            Showing ${data.users.length} of ${data.total} users
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load users:', error);
+                document.getElementById('usersList').innerHTML = '<p class="text-red-500">Failed to load users</p>';
+            }
+        }
+
+        // Load rewards list
+        async function loadRewards() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/rewards`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const container = document.getElementById('rewardsList');
+                    
+                    if (data.rewards.length === 0) {
+                        container.innerHTML = '<p class="text-gray-400 text-center py-8">No rewards found</p>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            ${data.rewards.map(r => `
+                                <div class="bg-gray-50 rounded-xl p-4 hover:shadow-md transition">
+                                    <div class="flex items-start justify-between mb-3">
+                                        <div class="flex-1">
+                                            <h4 class="font-bold text-gray-800 mb-1">${r.name}</h4>
+                                            <p class="text-xs text-gray-500 line-clamp-2">${r.description}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-sm font-semibold text-purple-600">${r.points.toLocaleString()} points</span>
+                                        <span class="text-xs px-2 py-1 rounded-full ${
+                                            r.stock > 10 ? 'bg-green-100 text-green-800' :
+                                            r.stock > 0 ? 'bg-yellow-100 text-yellow-800' :
+                                            'bg-red-100 text-red-800'
+                                        }">Stock: ${r.stock}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load rewards:', error);
+                document.getElementById('rewardsList').innerHTML = '<p class="text-red-500">Failed to load rewards</p>';
+            }
+        }
+
+        // Load transactions list
+        async function loadTransactions() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/transactions?page=1&limit=20`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const container = document.getElementById('transactionsList');
+                    
+                    if (data.transactions.length === 0) {
+                        container.innerHTML = '<p class="text-gray-400 text-center py-8">No transactions found</p>';
+                        return;
+                    }
+
+                    container.innerHTML = `
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-gray-200">
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Customer</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Points</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Method</th>
+                                        <th class="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.transactions.map(t => `
+                                        <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                            <td class="py-3 px-4">
+                                                <div class="font-semibold text-sm text-gray-800">${t.customerName}</div>
+                                                <div class="text-xs text-gray-500">${t.customerEmail}</div>
+                                            </td>
+                                            <td class="py-3 px-4 text-sm font-semibold text-gray-800">฿${parseFloat(t.amount).toLocaleString('th-TH', {minimumFractionDigits: 2})}</td>
+                                            <td class="py-3 px-4 text-sm font-semibold text-green-600">+${t.points}</td>
+                                            <td class="py-3 px-4 text-sm text-gray-600">${t.paymentMethod || 'Cash'}</td>
+                                            <td class="py-3 px-4 text-sm text-gray-500">${new Date(t.createdAt).toLocaleDateString('th-TH')}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-600">
+                            Showing ${data.transactions.length} of ${data.total} transactions
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to load transactions:', error);
+                document.getElementById('transactionsList').innerHTML = '<p class="text-red-500">Failed to load transactions</p>';
+            }
+        }
+
+        // Load on page load
+        window.addEventListener('load', () => {
+            loadDashboardStats();
+            initCharts();
+        });
+    </script>
+</body>
+</html>
