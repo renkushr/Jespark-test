@@ -16,6 +16,7 @@ import storeRoutes from './routes/stores.js';
 import couponRoutes from './routes/coupons.js';
 import cashierRoutes from './routes/cashier.js';
 import adminRoutes from './routes/admin.js';
+import settingsRoutes from './routes/settings.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { 
   sanitizeInput, 
@@ -35,7 +36,13 @@ const PORT = process.env.PORT || 5001;
 // CORS configuration
 const corsOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(s => s.trim())
-  : ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173'];
+  : [
+      'http://localhost:3000',      // Main Frontend
+      'http://127.0.0.1:3000',
+      'http://localhost:5173',      // Vite default
+      'http://localhost:3001',      // Admin Panel ✅
+      'http://127.0.0.1:3001'       // Admin Panel (127.0.0.1)
+    ];
 
 const isVercelOrigin = (origin) => origin && (
   origin.endsWith('.vercel.app') ||
@@ -98,6 +105,7 @@ app.use('/api/stores', storeRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/settings', settingsRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);

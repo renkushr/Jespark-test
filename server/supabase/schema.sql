@@ -4,6 +4,50 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- System Settings Table
+CREATE TABLE IF NOT EXISTS system_settings (
+  id BIGSERIAL PRIMARY KEY,
+  setting_key VARCHAR(255) UNIQUE NOT NULL,
+  setting_value TEXT,
+  setting_type VARCHAR(50) DEFAULT 'string', -- 'string', 'number', 'boolean', 'json'
+  category VARCHAR(100) DEFAULT 'general', -- 'general', 'points', 'tiers', 'rewards'
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert Default Settings
+INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description) VALUES
+-- Points Settings
+('points_earn_rate', '10', 'number', 'points', 'Percentage of purchase amount given as points (e.g., 10 = 10%)'),
+('points_value', '1', 'number', 'points', 'Value of 1 point in currency (1 point = X baht)'),
+('points_expiry_days', '365', 'number', 'points', 'Number of days before points expire (0 = never expire)'),
+('points_min_use', '10', 'number', 'points', 'Minimum points required to use for discount'),
+('points_max_use_per_transaction', '5000', 'number', 'points', 'Maximum points that can be used per transaction'),
+('points_max_discount_percent', '50', 'number', 'points', 'Maximum discount percentage allowed when using points'),
+
+-- Tier Settings
+('tier_bronze_min_points', '0', 'number', 'tiers', 'Minimum points for Bronze tier'),
+('tier_silver_min_points', '1000', 'number', 'tiers', 'Minimum points for Silver tier'),
+('tier_gold_min_points', '5000', 'number', 'tiers', 'Minimum points for Gold tier'),
+('tier_platinum_min_points', '10000', 'number', 'tiers', 'Minimum points for Platinum tier'),
+('tier_bronze_multiplier', '1', 'number', 'tiers', 'Points multiplier for Bronze tier'),
+('tier_silver_multiplier', '1.2', 'number', 'tiers', 'Points multiplier for Silver tier'),
+('tier_gold_multiplier', '1.5', 'number', 'tiers', 'Points multiplier for Gold tier'),
+('tier_platinum_multiplier', '2', 'number', 'tiers', 'Points multiplier for Platinum tier'),
+
+-- Reward Settings
+('reward_max_per_user', '5', 'number', 'rewards', 'Maximum rewards per user per month'),
+('reward_delivery_days', '7', 'number', 'rewards', 'Estimated delivery days for rewards'),
+('reward_notification_enabled', 'true', 'boolean', 'rewards', 'Enable notifications for reward redemptions'),
+
+-- General Settings
+('store_name', 'Jespark Rewards & Lifestyle', 'string', 'general', 'Store name'),
+('store_currency', 'THB', 'string', 'general', 'Store currency code'),
+('store_locale', 'th-TH', 'string', 'general', 'Store locale'),
+('maintenance_mode', 'false', 'boolean', 'general', 'Enable maintenance mode')
+ON CONFLICT (setting_key) DO NOTHING;
+
 -- Users Table
 CREATE TABLE users (
   id BIGSERIAL PRIMARY KEY,
