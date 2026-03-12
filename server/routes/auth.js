@@ -7,6 +7,15 @@ import { registerValidator, loginValidator, lineLoginValidator } from '../middle
 
 const router = express.Router();
 
+// Generate unique member ID (JSP-XXXXXX)
+const generateMemberId = async () => {
+  const { count } = await supabase
+    .from('users')
+    .select('*', { count: 'exact', head: true });
+  const nextId = (count || 0) + 1;
+  return `JSP-${String(nextId).padStart(6, '0')}`;
+};
+
 // Register
 router.post('/register', authLimiter, registerValidator, async (req, res) => {
   try {
@@ -31,6 +40,8 @@ router.post('/register', authLimiter, registerValidator, async (req, res) => {
     const memberSince = new Date().getFullYear().toString();
     const defaultAvatar = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(name) + '&size=200&background=13ec13&color=111811';
 
+    const memberId = await generateMemberId();
+
     // Create new user
     const { data: newUser, error: insertError } = await supabase
       .from('users')
@@ -44,7 +55,8 @@ router.post('/register', authLimiter, registerValidator, async (req, res) => {
         avatar: defaultAvatar,
         tier: 'Member',
         points: 0,
-        wallet_balance: 0
+        wallet_balance: 0,
+        member_id: memberId
       })
       .select()
       .single();
@@ -155,21 +167,36 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       const defaultPassword = await bcrypt.hash('line_' + lineId, 10);
       const lineEmail = email || `line_${lineId}@jespark.com`;
 
-      const { data: newUser, error: insertError } = await supabase
+      let memberId;
+      try { memberId = await generateMemberId(); } catch { memberId = null; }
+
+      const insertData = {
+        line_id: lineId,
+        email: lineEmail,
+        password: defaultPassword,
+        name,
+        member_since: memberSince,
+        avatar: avatar,
+        tier: 'Member',
+        points: 0,
+        wallet_balance: 0,
+      };
+      if (memberId) insertData.member_id = memberId;
+
+      let { data: newUser, error: insertError } = await supabase
         .from('users')
-        .insert({
-          line_id: lineId,
-          email: lineEmail,
-          password: defaultPassword,
-          name,
-          member_since: memberSince,
-          avatar: avatar,
-          tier: 'Member',
-          points: 0,
-          wallet_balance: 0
-        })
+        .insert(insertData)
         .select()
         .single();
+
+      // If member_id column doesn't exist, retry without it
+      if (insertError && memberId) {
+        console.warn('Retrying insert without member_id:', insertError.message);
+        delete insertData.member_id;
+        const retry = await supabase.from('users').insert(insertData).select().single();
+        newUser = retry.data;
+        insertError = retry.error;
+      }
 
       if (insertError) {
         console.error('LINE login insert error:', insertError);
@@ -211,14 +238,20 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       { expiresIn: '30d' }
     );
 
+    // Check if user needs to complete profile (no phone = new user)
+    const needsProfile = !user.phone;
+
     res.json({
       message: 'LINE login successful',
       token,
+      needsProfile,
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         tier: user.tier,
+        memberId: user.member_id,
         memberSince: user.member_since,
         points: user.points,
         walletBalance: user.wallet_balance,

@@ -5,7 +5,7 @@ import { authenticateToken } from '../middleware/auth.js';
 const router = express.Router();
 
 // Get all settings
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { category } = req.query;
 
@@ -48,7 +48,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // Get single setting
-router.get('/:key', authenticateToken, async (req, res) => {
+router.get('/:key', async (req, res) => {
   try {
     const { key } = req.params;
 
@@ -78,7 +78,7 @@ router.get('/:key', authenticateToken, async (req, res) => {
 });
 
 // Update single setting
-router.put('/:key', authenticateToken, async (req, res) => {
+router.put('/:key', async (req, res) => {
   try {
     const { key } = req.params;
     const { value } = req.body;
@@ -132,7 +132,7 @@ router.put('/:key', authenticateToken, async (req, res) => {
 });
 
 // Bulk update settings
-router.put('/', authenticateToken, async (req, res) => {
+router.put('/', async (req, res) => {
   try {
     const { settings } = req.body;
 
@@ -198,7 +198,7 @@ router.put('/', authenticateToken, async (req, res) => {
 });
 
 // Reset settings to default
-router.post('/reset', authenticateToken, async (req, res) => {
+router.post('/reset', async (req, res) => {
   try {
     const { category } = req.body;
 

@@ -41,6 +41,23 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Get all rewards (admin - raw fields)
+router.get('/admin/all', async (req, res) => {
+  try {
+    const { data: rewards, error } = await supabase
+      .from('rewards')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ rewards: rewards || [] });
+  } catch (error) {
+    console.error('Get admin rewards error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get reward by ID
 router.get('/:id', idParamValidator, async (req, res) => {
   try {

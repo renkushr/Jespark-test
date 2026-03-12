@@ -25,10 +25,12 @@ router.get('/me', authenticateToken, async (req, res) => {
       phone: user.phone,
       birthDate: user.birth_date,
       tier: user.tier,
+      memberId: user.member_id,
       memberSince: user.member_since,
       points: user.points,
       walletBalance: user.wallet_balance,
-      avatar: user.avatar
+      avatar: user.avatar,
+      needsProfile: !user.phone
     });
   } catch (error) {
     console.error('Get user error:', error);

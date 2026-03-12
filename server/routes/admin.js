@@ -114,6 +114,134 @@ router.get('/rewards', async (req, res) => {
   }
 });
 
+// Get customers list
+router.get('/customers', async (req, res) => {
+  try {
+    const { limit = 100, offset = 0, search = '', tier = '' } = req.query;
+
+    let query = supabase
+      .from('users')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (search) {
+      query = query.or(`display_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,member_id.ilike.%${search}%`);
+    }
+
+    if (tier) {
+      query = query.eq('tier', tier);
+    }
+
+    const { data: users, error, count } = await query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (error) throw error;
+
+    res.json({
+      customers: users.map(user => ({
+        id: user.id,
+        member_id: user.member_id,
+        display_name: user.display_name,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        tier: user.tier,
+        points: user.points,
+        wallet_balance: user.wallet_balance,
+        is_verified: user.is_verified,
+        member_since: user.member_since,
+        created_at: user.created_at
+      })),
+      total: count
+    });
+  } catch (error) {
+    console.error('Get customers error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get single customer by ID
+router.get('/customers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', parseInt(id))
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    res.json({
+      customer: {
+        id: user.id,
+        member_id: user.member_id,
+        display_name: user.display_name,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        tier: user.tier,
+        points: user.points,
+        wallet_balance: user.wallet_balance,
+        is_verified: user.is_verified,
+        member_since: user.member_since,
+        created_at: user.created_at
+      }
+    });
+  } catch (error) {
+    console.error('Get customer error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Add points to customer
+router.post('/points/add', async (req, res) => {
+  try {
+    const { userId, points, title } = req.body;
+
+    if (!userId || !points || points <= 0) {
+      return res.status(400).json({ error: 'Valid userId and points required' });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('points')
+      .eq('id', userId)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('users')
+      .update({ points: user.points + points })
+      .eq('id', userId)
+      .select('points')
+      .single();
+
+    if (updateError) throw updateError;
+
+    await supabase
+      .from('points_history')
+      .insert({
+        user_id: userId,
+        points: points,
+        type: 'earned',
+        description: title || 'เพิ่มคะแนนจาก Admin'
+      });
+
+    res.json({
+      message: 'Points added successfully',
+      points: updatedUser.points
+    });
+  } catch (error) {
+    console.error('Add points error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get recent transactions
 router.get('/transactions/recent', async (req, res) => {
   try {
@@ -882,7 +1010,7 @@ router.post('/rewards', async (req, res) => {
         description,
         points_required,
         category,
-        image,
+        image_url: image,
         stock
       })
       .select()
@@ -910,7 +1038,7 @@ router.put('/rewards/:id', async (req, res) => {
         description,
         points_required,
         category,
-        image,
+        image_url: image,
         stock
       })
       .eq('id', id)
@@ -942,6 +1070,312 @@ router.delete('/rewards/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete reward error:', error);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== REDEMPTIONS MANAGEMENT ====================
+
+// Get all redemptions (admin)
+router.get('/redemptions', async (req, res) => {
+  try {
+    const { status, userId, limit = 50, offset = 0 } = req.query;
+
+    let query = supabase
+      .from('redemptions')
+      .select(`
+        *,
+        rewards:reward_id (name, image_url, points_required, category),
+        users:user_id (id, name, email, phone, member_id)
+      `, { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (status) query = query.eq('status', status);
+    if (userId) query = query.eq('user_id', parseInt(userId));
+    query = query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    const { data: redemptions, error, count } = await query;
+    if (error) throw error;
+
+    res.json({
+      redemptions: redemptions.map(r => ({
+        id: r.id,
+        user_id: r.user_id,
+        reward_id: r.reward_id,
+        points_used: r.points_used,
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        reward: r.rewards ? { name: r.rewards.name, image: r.rewards.image_url, points: r.rewards.points_required, category: r.rewards.category } : null,
+        user: r.users ? { id: r.users.id, name: r.users.name, email: r.users.email, phone: r.users.phone, member_id: r.users.member_id } : null
+      })),
+      total: count
+    });
+  } catch (error) {
+    console.error('Get redemptions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update redemption status (approve/reject)
+router.put('/redemptions/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, note } = req.body;
+
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const { data: redemption, error: findError } = await supabase
+      .from('redemptions')
+      .select('*, users:user_id (id, name, points)')
+      .eq('id', id)
+      .single();
+
+    if (findError || !redemption) {
+      return res.status(404).json({ error: 'Redemption not found' });
+    }
+
+    // If rejecting, refund points
+    if (status === 'rejected' && redemption.status === 'pending') {
+      const newPoints = (redemption.users?.points || 0) + redemption.points_used;
+      await supabase.from('users').update({ points: newPoints }).eq('id', redemption.user_id);
+      await supabase.from('points_history').insert({
+        user_id: redemption.user_id,
+        points: redemption.points_used,
+        type: 'refund',
+        description: `คืนคะแนนจากการปฏิเสธการแลก #${id}`
+      });
+    }
+
+    const { data, error } = await supabase
+      .from('redemptions')
+      .update({ status, admin_note: note || null, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Send notification
+    await supabase.from('notifications').insert({
+      user_id: redemption.user_id,
+      title: status === 'approved' ? 'การแลกของรางวัลได้รับการอนุมัติ' : 'การแลกของรางวัลถูกปฏิเสธ',
+      message: status === 'approved' ? `การแลกของรางวัล #${id} ได้รับการอนุมัติแล้ว` : `การแลกของรางวัล #${id} ถูกปฏิเสธ${note ? ': ' + note : ''}`,
+      type: status === 'approved' ? 'success' : 'warning'
+    });
+
+    res.json({ message: `Redemption ${status}`, redemption: data });
+  } catch (error) {
+    console.error('Update redemption error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== NOTIFICATIONS MANAGEMENT ====================
+
+// Get all notifications (admin view)
+router.get('/notifications', async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+
+    const { data: notifications, error, count } = await supabase
+      .from('notifications')
+      .select('*, users:user_id (name, email)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (error) throw error;
+
+    res.json({
+      notifications: notifications.map(n => ({
+        id: n.id,
+        user_id: n.user_id,
+        title: n.title,
+        message: n.message,
+        type: n.type,
+        is_read: n.is_read,
+        created_at: n.created_at,
+        user: n.users ? { name: n.users.name, email: n.users.email } : null
+      })),
+      total: count
+    });
+  } catch (error) {
+    console.error('Get notifications error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Send notification to user(s)
+router.post('/notifications/send', async (req, res) => {
+  try {
+    const { userIds, title, message, type = 'info' } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ error: 'Title and message are required' });
+    }
+
+    let targetUserIds = userIds;
+
+    // If no userIds, send to all users
+    if (!targetUserIds || targetUserIds.length === 0) {
+      const { data: allUsers } = await supabase.from('users').select('id');
+      targetUserIds = allUsers?.map(u => u.id) || [];
+    }
+
+    const notifications = targetUserIds.map(userId => ({
+      user_id: userId,
+      title,
+      message,
+      type,
+      is_read: false
+    }));
+
+    const { data, error } = await supabase.from('notifications').insert(notifications).select();
+    if (error) throw error;
+
+    res.json({ message: `Sent ${data.length} notifications`, count: data.length });
+  } catch (error) {
+    console.error('Send notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete notification
+router.delete('/notifications/:id', async (req, res) => {
+  try {
+    const { error } = await supabase.from('notifications').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ message: 'Notification deleted' });
+  } catch (error) {
+    console.error('Delete notification error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== COUPONS MANAGEMENT ====================
+
+// Get all coupons (admin)
+router.get('/coupons', async (req, res) => {
+  try {
+    const { limit = 50, offset = 0 } = req.query;
+
+    const { data: coupons, error, count } = await supabase
+      .from('coupons')
+      .select('*, users:user_id (name, email)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    if (error) throw error;
+
+    res.json({
+      coupons: coupons.map(c => ({
+        id: c.id,
+        code: c.code,
+        title: c.title,
+        description: c.description,
+        discount_type: c.discount_type,
+        discount_value: c.discount_value,
+        min_purchase: c.min_purchase,
+        expires_at: c.expires_at,
+        is_used: c.is_used,
+        used_at: c.used_at,
+        user_id: c.user_id,
+        created_at: c.created_at,
+        user: c.users ? { name: c.users.name, email: c.users.email } : null
+      })),
+      total: count
+    });
+  } catch (error) {
+    console.error('Get coupons error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Create coupon
+router.post('/coupons', async (req, res) => {
+  try {
+    const { code, title, description, discount_type, discount_value, min_purchase, expires_at, user_id } = req.body;
+
+    if (!code || !title || !discount_type || !discount_value) {
+      return res.status(400).json({ error: 'Code, title, discount_type, and discount_value are required' });
+    }
+
+    const { data, error } = await supabase
+      .from('coupons')
+      .insert({ code, title, description, discount_type, discount_value, min_purchase: min_purchase || 0, expires_at, user_id: user_id || null, is_used: false })
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ message: 'Coupon created', coupon: data });
+  } catch (error) {
+    console.error('Create coupon error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Delete coupon
+router.delete('/coupons/:id', async (req, res) => {
+  try {
+    const { error } = await supabase.from('coupons').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ message: 'Coupon deleted' });
+  } catch (error) {
+    console.error('Delete coupon error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== CUSTOMER TRANSACTIONS ====================
+
+// Get customer transactions
+router.get('/customer/:id/transactions', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data: transactions, error } = await supabase
+      .from('cashier_transactions')
+      .select('*')
+      .eq('customer_id', parseInt(id))
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+
+    res.json({
+      transactions: transactions.map(t => ({
+        id: t.id,
+        amount: parseFloat(t.amount),
+        pointsEarned: t.points_earned,
+        pointsUsed: t.points_used,
+        paymentMethod: t.payment_method,
+        status: t.status,
+        createdAt: t.created_at
+      }))
+    });
+  } catch (error) {
+    console.error('Get customer transactions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== END MANAGEMENT ENDPOINTS ====================
+
+// TEMPORARY: Reset all data (remove this in production!)
+router.delete('/reset-all-data', async (req, res) => {
+  try {
+    // Delete in order to avoid foreign key issues
+    await supabase.from('notifications').delete().neq('id', 0);
+    await supabase.from('points_history').delete().neq('id', 0);
+    await supabase.from('cashier_transactions').delete().neq('id', 0);
+    await supabase.from('wallet_transactions').delete().neq('id', 0);
+    await supabase.from('redemptions').delete().neq('id', 0);
+    await supabase.from('users').delete().neq('id', 0);
+
+    res.json({ message: 'All data has been reset successfully' });
+  } catch (error) {
+    console.error('Reset data error:', error);
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 

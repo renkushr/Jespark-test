@@ -17,6 +17,7 @@ import couponRoutes from './routes/coupons.js';
 import cashierRoutes from './routes/cashier.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
+import slipCashierRoutes from './routes/slipCashier.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { 
   sanitizeInput, 
@@ -50,10 +51,25 @@ const isVercelOrigin = (origin) => origin && (
   origin.startsWith('https://') && origin.includes('vercel.app')
 );
 
+const isNetlifyOrigin = (origin) => origin && origin.endsWith('.netlify.app');
+
+// Handle preflight OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  if (!origin || corsOrigins.indexOf(origin) !== -1 || isVercelOrigin(origin) || isNetlifyOrigin(origin)) {
+    res.set('Access-Control-Allow-Origin', origin || '*');
+    res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Allow-Credentials', 'true');
+    res.set('Access-Control-Max-Age', '86400');
+  }
+  res.status(204).end();
+});
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
-    if (corsOrigins.indexOf(origin) !== -1 || isVercelOrigin(origin) || process.env.NODE_ENV === 'development') {
+    if (corsOrigins.indexOf(origin) !== -1 || isVercelOrigin(origin) || isNetlifyOrigin(origin) || process.env.NODE_ENV === 'development') {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -106,6 +122,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/slip-cashier', slipCashierRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);

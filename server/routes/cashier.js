@@ -6,7 +6,7 @@ import { transactionLimiter } from '../middleware/rateLimiter.js';
 const router = express.Router();
 
 // Search customer by email or phone
-router.get('/search', authenticateToken, async (req, res) => {
+router.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
 
@@ -14,13 +14,22 @@ router.get('/search', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Search query required' });
     }
 
-    // Search by email or phone
-    const { data: users, error } = await supabase
+    // Try exact match first (phone or email)
+    let { data: users, error } = await supabase
       .from('users')
       .select('*')
-      .or(`email.eq.${q},phone.eq.${q},email.ilike.${q}`);
+      .or(`phone.eq.${q},email.eq.${q}`);
 
     if (error) throw error;
+
+    // If no exact match, try partial search by name or phone
+    if (!users || users.length === 0) {
+      const { data: partialUsers, error: partialError } = await supabase
+        .from('users')
+        .select('*')
+        .or(`phone.ilike.%${q}%,name.ilike.%${q}%`);
+      if (!partialError) users = partialUsers;
+    }
 
     const user = users && users.length > 0 ? users[0] : null;
 
@@ -34,6 +43,7 @@ router.get('/search', authenticateToken, async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        memberId: user.member_id,
         tier: user.tier,
         memberSince: user.member_since,
         points: user.points,
@@ -48,7 +58,7 @@ router.get('/search', authenticateToken, async (req, res) => {
 });
 
 // Cashier checkout - charge customer and give points
-router.post('/checkout', authenticateToken, transactionLimiter, async (req, res) => {
+router.post('/checkout', transactionLimiter, async (req, res) => {
   try {
     const { customerId, amount } = req.body;
 
@@ -67,8 +77,8 @@ router.post('/checkout', authenticateToken, transactionLimiter, async (req, res)
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    // Calculate earned points (10% of amount)
-    const earnedPoints = Math.floor(amount * 0.1);
+    // Calculate earned points (every 35 baht = 1 point)
+    const earnedPoints = Math.floor(amount / 35) * 5;
     
     // Update customer points
     const { data: updatedCustomer, error: updateError } = await supabase
@@ -85,7 +95,7 @@ router.post('/checkout', authenticateToken, transactionLimiter, async (req, res)
       .from('cashier_transactions')
       .insert({
         customer_id: customer.id,
-        cashier_id: req.user.userId,
+        cashier_id: req.user?.userId || null,
         amount: amount,
         points_earned: earnedPoints,
         payment_method: 'cash'
@@ -130,7 +140,7 @@ router.post('/checkout', authenticateToken, transactionLimiter, async (req, res)
 });
 
 // Get cashier statistics (optional - for dashboard)
-router.get('/stats', authenticateToken, async (req, res) => {
+router.get('/stats', async (req, res) => {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -172,10 +182,150 @@ router.get('/stats', authenticateToken, async (req, res) => {
   }
 });
 
+// Search customer by member_id (for QR code scan)
+router.get('/scan-lookup', async (req, res) => {
+  try {
+    const { memberId } = req.query;
+
+    if (!memberId) {
+      return res.status(400).json({ error: 'Member ID required' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('member_id', memberId)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'ไม่พบสมาชิกจากรหัสนี้' });
+    }
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name || user.display_name,
+        email: user.email,
+        phone: user.phone,
+        tier: user.tier,
+        memberId: user.member_id,
+        memberSince: user.member_since,
+        points: user.points,
+        walletBalance: user.wallet_balance,
+        avatar: user.avatar
+      }
+    });
+  } catch (error) {
+    console.error('Scan lookup error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Wallet Pay - deduct from wallet + give points
+router.post('/wallet-pay', transactionLimiter, async (req, res) => {
+  try {
+    const { customerId, amount } = req.body;
+
+    if (!customerId || !amount || amount <= 0) {
+      return res.status(400).json({ error: 'Valid customer ID and amount required' });
+    }
+
+    // Get customer
+    const { data: customer, error: customerError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', parseInt(customerId))
+      .single();
+
+    if (customerError || !customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Check wallet balance
+    if (customer.wallet_balance < amount) {
+      return res.status(400).json({ error: `ยอดเงินในวอลเล็ตไม่เพียงพอ (คงเหลือ ฿${customer.wallet_balance.toFixed(2)})` });
+    }
+
+    // Calculate earned points (every 35 baht = 1 point)
+    const earnedPoints = Math.floor(amount / 35) * 5;
+
+    // Update customer: deduct wallet + add points
+    const { data: updatedCustomer, error: updateError } = await supabase
+      .from('users')
+      .update({
+        wallet_balance: customer.wallet_balance - amount,
+        points: customer.points + earnedPoints
+      })
+      .eq('id', customer.id)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Create cashier transaction record
+    await supabase
+      .from('cashier_transactions')
+      .insert({
+        customer_id: customer.id,
+        cashier_id: req.user?.userId || null,
+        amount: amount,
+        points_earned: earnedPoints,
+        payment_method: 'wallet',
+        status: 'completed'
+      });
+
+    // Create points history
+    await supabase
+      .from('points_history')
+      .insert({
+        user_id: customer.id,
+        points: earnedPoints,
+        type: 'earned',
+        description: `Wallet Payment - ฿${amount.toFixed(2)}`
+      });
+
+    // Create wallet transaction
+    await supabase
+      .from('wallet_transactions')
+      .insert({
+        user_id: customer.id,
+        amount: -amount,
+        type: 'payment',
+        description: `ชำระเงินที่ร้าน - ฿${amount.toFixed(2)}`
+      });
+
+    // Create notification
+    await supabase
+      .from('notifications')
+      .insert({
+        user_id: customer.id,
+        title: 'ชำระเงินสำเร็จ!',
+        message: `ชำระ ฿${amount.toFixed(2)} จากวอลเล็ต ได้รับ ${earnedPoints} คะแนน`,
+        type: 'success'
+      });
+
+    res.json({
+      message: 'Wallet payment successful',
+      earnedPoints: earnedPoints,
+      totalPoints: updatedCustomer.points,
+      walletBalance: updatedCustomer.wallet_balance,
+      transaction: {
+        amount: amount,
+        points: earnedPoints,
+        paymentMethod: 'wallet',
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Wallet pay error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // ==================== ENHANCED CASHIER FEATURES ====================
 
 // Get transaction history
-router.get('/transactions', authenticateToken, async (req, res) => {
+router.get('/transactions', async (req, res) => {
   try {
     const { limit = 50, offset = 0, customerId, startDate, endDate } = req.query;
 
@@ -234,7 +384,7 @@ router.get('/transactions', authenticateToken, async (req, res) => {
 });
 
 // Checkout with points discount
-router.post('/checkout-with-points', authenticateToken, transactionLimiter, async (req, res) => {
+router.post('/checkout-with-points', transactionLimiter, async (req, res) => {
   try {
     const { customerId, amount, usePoints, paymentMethod = 'cash' } = req.body;
 
@@ -263,8 +413,8 @@ router.post('/checkout-with-points', authenticateToken, transactionLimiter, asyn
     const discount = pointsToUse;
     const finalAmount = Math.max(0, amount - discount);
 
-    // Calculate earned points (10% of final amount)
-    const earnedPoints = Math.floor(finalAmount * 0.1);
+    // Calculate earned points (every 35 baht = 1 point)
+    const earnedPoints = Math.floor(finalAmount / 35) * 5;
     
     // Update customer points
     const newPoints = customer.points - pointsToUse + earnedPoints;
@@ -282,7 +432,7 @@ router.post('/checkout-with-points', authenticateToken, transactionLimiter, asyn
       .from('cashier_transactions')
       .insert({
         customer_id: customer.id,
-        cashier_id: req.user.userId,
+        cashier_id: req.user?.userId || null,
         amount: amount,
         points_earned: earnedPoints,
         points_used: pointsToUse,
@@ -361,7 +511,7 @@ router.post('/checkout-with-points', authenticateToken, transactionLimiter, asyn
 });
 
 // Refund/Void transaction
-router.post('/refund/:transactionId', authenticateToken, async (req, res) => {
+router.post('/refund/:transactionId', async (req, res) => {
   try {
     const { transactionId } = req.params;
     const { reason } = req.body;
@@ -410,7 +560,7 @@ router.post('/refund/:transactionId', authenticateToken, async (req, res) => {
         status: 'refunded',
         refund_reason: reason || 'Refund requested',
         refunded_at: new Date().toISOString(),
-        refunded_by: req.user.userId
+        refunded_by: req.user?.userId || null
       })
       .eq('id', transactionId);
 
@@ -468,19 +618,24 @@ router.post('/refund/:transactionId', authenticateToken, async (req, res) => {
 });
 
 // Get today's summary for current cashier
-router.get('/my-summary', authenticateToken, async (req, res) => {
+router.get('/my-summary', async (req, res) => {
   try {
-    const cashierId = req.user.userId;
+    const cashierId = req.user?.userId || null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayISO = today.toISOString();
 
-    // Get today's transactions for this cashier
-    const { data: transactions, error } = await supabase
+    // Get today's transactions (filter by cashier if available)
+    let query = supabase
       .from('cashier_transactions')
       .select('*')
-      .eq('cashier_id', cashierId)
       .gte('created_at', todayISO);
+
+    if (cashierId) {
+      query = query.eq('cashier_id', cashierId);
+    }
+
+    const { data: transactions, error } = await query;
 
     if (error) throw error;
 
