@@ -1,21 +1,34 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User } from '../types';
+import apiClient from '../src/api/client';
+import { useAuth } from '../src/context/AuthContext';
 
 interface SettingsProps {
   user: User;
-  setUser: React.Dispatch<React.SetStateAction<User>>;
+  setUser: (updates: Partial<User>) => void;
 }
 
 const Settings: React.FC<SettingsProps> = ({ user, setUser }) => {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [name, setName] = useState(user.name);
-  const [email, setEmail] = useState('alex.johnson@jespark.com');
+  const [email, setEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSave = () => {
-    setUser({ ...user, name });
-    navigate(-1);
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError('');
+      await apiClient.updateProfile(name);
+      await refreshUser();
+      navigate(-1);
+    } catch (err: any) {
+      setError(err.message || 'บันทึกไม่สำเร็จ');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (

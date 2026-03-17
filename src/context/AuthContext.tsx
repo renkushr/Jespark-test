@@ -35,10 +35,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser({
         name: userData.name,
         tier: userData.tier,
+        memberId: userData.memberId || '',
         memberSince: userData.memberSince,
         points: userData.points,
         walletBalance: userData.walletBalance,
         avatar: userData.avatar,
+        needsProfile: userData.needsProfile,
       });
       setIsLoggedIn(true);
     } catch (error) {
@@ -57,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser({
       name: response.user.name,
       tier: response.user.tier,
+      memberId: response.user.memberId || '',
       memberSince: response.user.memberSince,
       points: response.user.points,
       walletBalance: response.user.walletBalance,
@@ -76,10 +79,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser({
       name: response.user.name,
       tier: response.user.tier,
+      memberId: response.user.memberId || '',
       memberSince: response.user.memberSince,
       points: response.user.points,
       walletBalance: response.user.walletBalance,
       avatar: response.user.avatar,
+      needsProfile: (response as any).needsProfile,
     });
     setIsLoggedIn(true);
   };

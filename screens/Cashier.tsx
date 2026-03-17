@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Html5Qrcode } from 'html5-qrcode';
 import apiClient from '../src/api/client';
 
 interface Customer {
@@ -12,7 +13,10 @@ interface Customer {
   points: number;
   walletBalance: number;
   avatar: string;
+  memberId?: string;
 }
+
+type PaymentMode = 'cash' | 'wallet';
 
 const Cashier: React.FC = () => {
   const navigate = useNavigate();
@@ -23,10 +27,22 @@ const Cashier: React.FC = () => {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+
+  // Cleanup scanner on unmount
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      setError('กรุณาใส่อีเมลหรือเบอร์โทรศัพท์');
+      setError('กรุณาใส่อีเมล, เบอร์โทร หรือรหัสสมาชิก');
       return;
     }
 
@@ -34,6 +50,19 @@ const Cashier: React.FC = () => {
       setSearching(true);
       setError('');
       setCustomer(null);
+
+      // Try member_id lookup first if it looks like a member ID
+      if (searchQuery.startsWith('JSP-')) {
+        try {
+          const response = await apiClient.scanLookup(searchQuery);
+          setCustomer(response.user);
+          setSuccess('พบข้อมูลลูกค้า');
+          setTimeout(() => setSuccess(''), 2000);
+          return;
+        } catch {
+          // fallback to normal search
+        }
+      }
       
       const response = await apiClient.searchCustomer(searchQuery);
       setCustomer(response.user);
@@ -45,6 +74,69 @@ const Cashier: React.FC = () => {
     } finally {
       setSearching(false);
     }
+  };
+
+  const startScanner = async () => {
+    setScanning(true);
+    setError('');
+
+    try {
+      const html5QrCode = new Html5Qrcode('qr-reader');
+      scannerRef.current = html5QrCode;
+
+      await html5QrCode.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          // Stop scanner immediately
+          await html5QrCode.stop();
+          scannerRef.current = null;
+          setScanning(false);
+
+          try {
+            const qrData = JSON.parse(decodedText);
+            const memberId = qrData.memberId;
+            const type = qrData.type; // 'earn' or 'pay'
+
+            if (!memberId) {
+              setError('QR Code ไม่ถูกต้อง');
+              return;
+            }
+
+            // Set payment mode based on QR type
+            if (type === 'pay') {
+              setPaymentMode('wallet');
+            } else {
+              setPaymentMode('cash');
+            }
+
+            // Lookup customer by member_id
+            setSearching(true);
+            const response = await apiClient.scanLookup(memberId);
+            setCustomer(response.user);
+            setSearchQuery(memberId);
+            setSuccess(`สแกนสำเร็จ! พบลูกค้า: ${response.user.name}`);
+            setTimeout(() => setSuccess(''), 3000);
+          } catch (err: any) {
+            setError(err.message || 'ไม่พบข้อมูลจาก QR Code นี้');
+          } finally {
+            setSearching(false);
+          }
+        },
+        () => {} // ignore errors during scanning
+      );
+    } catch (err: any) {
+      setScanning(false);
+      setError('ไม่สามารถเปิดกล้องได้ กรุณาอนุญาตการใช้กล้อง');
+    }
+  };
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      await scannerRef.current.stop().catch(() => {});
+      scannerRef.current = null;
+    }
+    setScanning(false);
   };
 
   const handleCheckout = async () => {
@@ -62,17 +154,34 @@ const Cashier: React.FC = () => {
     try {
       setLoading(true);
       setError('');
+
+      if (paymentMode === 'wallet') {
+        // Wallet Pay
+        const response = await apiClient.walletPay(customer.id, amountNum);
+        setSuccess(`✅ ชำระผ่านวอลเล็ตสำเร็จ! ได้รับ ${response.earnedPoints} คะแนน | คงเหลือ ฿${response.walletBalance.toLocaleString()}`);
+        setAmount('');
+        // Refresh customer
+        try {
+          const updated = await apiClient.scanLookup(customer.memberId || searchQuery);
+          setCustomer(updated.user);
+        } catch {
+          setCustomer(prev => prev ? { ...prev, points: response.totalPoints, walletBalance: response.walletBalance } : null);
+        }
+      } else {
+        // Cash checkout
+        const response = await apiClient.cashierCheckout(customer.id, amountNum);
+        setSuccess(`✅ คิดเงินสำเร็จ! ลูกค้าได้รับ ${response.earnedPoints} คะแนน`);
+        setAmount('');
+        // Refresh customer
+        try {
+          const updated = await apiClient.searchCustomer(searchQuery);
+          setCustomer(updated.user);
+        } catch {
+          setCustomer(prev => prev ? { ...prev, points: response.totalPoints } : null);
+        }
+      }
       
-      const response = await apiClient.cashierCheckout(customer.id, amountNum);
-      
-      setSuccess(`✅ คิดเงินสำเร็จ! ลูกค้าได้รับ ${response.earnedPoints} คะแนน`);
-      setAmount('');
-      
-      // Refresh customer data
-      const updatedCustomer = await apiClient.searchCustomer(searchQuery);
-      setCustomer(updatedCustomer.user);
-      
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 4000);
     } catch (err: any) {
       setError(err.message || 'เกิดข้อผิดพลาด');
     } finally {
@@ -80,7 +189,7 @@ const Cashier: React.FC = () => {
     }
   };
 
-  const earnedPoints = amount ? Math.floor(parseFloat(amount) * 0.1) : 0;
+  const earnedPoints = amount ? Math.floor(parseFloat(amount) / 35) * 5 : 0;
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -93,7 +202,7 @@ const Cashier: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-black text-dark-green">ระบบแคชเชียร์</h1>
-              <p className="text-xs text-gray-500">คิดเงินและให้คะแนนลูกค้า</p>
+              <p className="text-xs text-gray-500">สแกน QR · คิดเงิน · ให้คะแนน</p>
             </div>
           </div>
           <button 
@@ -105,77 +214,161 @@ const Cashier: React.FC = () => {
         </div>
       </header>
 
-      <div className="flex-1 p-6 max-w-4xl mx-auto w-full">
-        {/* Search Customer */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
-          <h2 className="text-lg font-black text-dark-green mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">search</span>
-            ค้นหาลูกค้า
-          </h2>
-          
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="อีเมลหรือเบอร์โทรศัพท์"
-              className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none font-medium"
-            />
+      <div className="flex-1 p-6 max-w-4xl mx-auto w-full space-y-6">
+
+        {/* QR Scanner */}
+        {scanning && (
+          <div className="bg-white rounded-2xl shadow-lg p-6 animate-fade-in">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-black text-dark-green flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">qr_code_scanner</span>
+                กำลังสแกน QR Code...
+              </h2>
+              <button onClick={stopScanner} className="px-4 py-2 bg-red-100 text-red-600 rounded-xl font-bold text-sm hover:bg-red-200 transition-colors">
+                ยกเลิก
+              </button>
+            </div>
+            <div id="qr-reader" className="rounded-xl overflow-hidden" style={{ width: '100%' }}></div>
+          </div>
+        )}
+
+        {/* Search + Scan */}
+        {!scanning && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h2 className="text-lg font-black text-dark-green mb-4 flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">person_search</span>
+              ค้นหาลูกค้า
+            </h2>
+            
+            <div className="flex gap-3 mb-3">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                placeholder="อีเมล, เบอร์โทร หรือรหัสสมาชิก (JSP-...)"
+                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none font-medium text-sm"
+              />
+              <button
+                onClick={handleSearch}
+                disabled={searching}
+                className="px-5 py-3 bg-primary text-white rounded-xl font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {searching ? (
+                  <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-lg">search</span>
+                )}
+              </button>
+            </div>
+
+            {/* Scan QR Button */}
             <button
-              onClick={handleSearch}
-              disabled={searching}
-              className="px-6 py-3 bg-primary text-white rounded-xl font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-2"
+              onClick={startScanner}
+              className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-xl font-black text-base hover:brightness-110 transition-all flex items-center justify-center gap-3 shadow-lg"
             >
-              {searching ? (
-                <span className="material-symbols-outlined animate-spin">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined">search</span>
-              )}
-              ค้นหา
+              <span className="material-symbols-outlined text-2xl">qr_code_scanner</span>
+              สแกน QR Code ลูกค้า
             </button>
           </div>
-        </div>
+        )}
+
+        {/* Messages */}
+        {error && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
+            <span className="material-symbols-outlined text-red-600">error</span>
+            <span className="text-red-600 font-bold text-sm">{error}</span>
+            <button onClick={() => setError('')} className="ml-auto">
+              <span className="material-symbols-outlined text-red-400 text-sm">close</span>
+            </button>
+          </div>
+        )}
+
+        {success && (
+          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 flex items-center gap-3 animate-fade-in">
+            <span className="material-symbols-outlined text-green-600">check_circle</span>
+            <span className="text-green-600 font-bold text-sm">{success}</span>
+          </div>
+        )}
 
         {/* Customer Info */}
         {customer && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-lg p-6 animate-fade-in">
             <h2 className="text-lg font-black text-dark-green mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">person</span>
               ข้อมูลลูกค้า
             </h2>
             
             <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-primary/5 to-transparent rounded-xl">
-              <img 
-                src={customer.avatar} 
-                alt={customer.name}
-                className="size-16 rounded-full border-4 border-white shadow-lg"
-              />
-              <div className="flex-1">
-                <h3 className="text-xl font-black text-dark-green">{customer.name}</h3>
-                <p className="text-sm text-gray-600">{customer.email}</p>
-                <p className="text-sm text-gray-600">{customer.phone}</p>
+              <div className="size-16 rounded-full bg-primary/10 border-4 border-white shadow-lg flex items-center justify-center">
+                {customer.avatar ? (
+                  <img src={customer.avatar} alt={customer.name} className="size-full rounded-full object-cover" />
+                ) : (
+                  <span className="material-symbols-outlined text-primary text-2xl">person</span>
+                )}
               </div>
-              <div className="text-right">
-                <div className="px-4 py-1 bg-primary/10 rounded-full mb-2">
-                  <span className="text-sm font-black text-primary">{customer.tier}</span>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-black text-dark-green truncate">{customer.name}</h3>
+                {customer.memberId && (
+                  <p className="text-xs font-mono text-primary font-bold">{customer.memberId}</p>
+                )}
+                <p className="text-xs text-gray-500 truncate">{customer.email} · {customer.phone}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="px-3 py-1 bg-primary/10 rounded-full mb-1">
+                  <span className="text-xs font-black text-primary">{customer.tier}</span>
                 </div>
-                <div className="text-2xl font-black text-primary">{customer.points.toLocaleString()}</div>
-                <div className="text-xs text-gray-500">คะแนนสะสม</div>
+                <div className="text-xl font-black text-primary">{customer.points.toLocaleString()}</div>
+                <div className="text-[10px] text-gray-500">คะแนนสะสม</div>
               </div>
+            </div>
+
+            {/* Wallet Balance */}
+            <div className="mt-3 p-3 bg-blue-50 rounded-xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-blue-600 text-lg">account_balance_wallet</span>
+                <span className="text-sm font-bold text-blue-700">วอลเล็ต</span>
+              </div>
+              <span className="text-lg font-black text-blue-800">฿{(customer.walletBalance || 0).toLocaleString()}</span>
             </div>
           </div>
         )}
 
         {/* Checkout */}
         {customer && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="bg-white rounded-2xl shadow-lg p-6">
             <h2 className="text-lg font-black text-dark-green mb-4 flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">payments</span>
               คิดเงิน
             </h2>
             
             <div className="space-y-4">
+              {/* Payment Mode */}
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">วิธีชำระเงิน</label>
+                <div className="flex h-12 w-full items-center justify-center rounded-xl bg-gray-100 p-1.5">
+                  <button
+                    onClick={() => setPaymentMode('cash')}
+                    className={`flex-1 h-full rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                      paymentMode === 'cash' ? 'bg-white text-dark-green shadow-md' : 'text-gray-400'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">payments</span>
+                    เงินสด
+                  </button>
+                  <button
+                    onClick={() => setPaymentMode('wallet')}
+                    className={`flex-1 h-full rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 ${
+                      paymentMode === 'wallet' ? 'bg-white text-blue-700 shadow-md' : 'text-gray-400'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">account_balance_wallet</span>
+                    วอลเล็ต
+                  </button>
+                </div>
+              </div>
+
+              {/* Amount */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-2">จำนวนเงิน (บาท)</label>
                 <input
@@ -187,23 +380,60 @@ const Cashier: React.FC = () => {
                 />
               </div>
 
-              {amount && (
-                <div className="p-4 bg-green-50 border-2 border-green-200 rounded-xl">
+              {/* Quick Amount */}
+              <div className="grid grid-cols-4 gap-2">
+                {[100, 200, 500, 1000].map(val => (
+                  <button
+                    key={val}
+                    onClick={() => setAmount(String(val))}
+                    className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all font-bold text-gray-700 text-sm border border-gray-200"
+                  >
+                    {val} ฿
+                  </button>
+                ))}
+              </div>
+
+              {/* Points Preview */}
+              {amount && parseFloat(amount) > 0 && (
+                <div className="p-4 bg-green-50 border-2 border-green-200 rounded-xl space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-gray-700">คะแนนที่จะได้รับ (10%)</span>
+                    <span className="text-sm font-bold text-gray-700">คะแนนที่จะได้รับ (ทุก 35฿ = 5 แต้ม)</span>
                     <span className="text-2xl font-black text-green-600">+{earnedPoints}</span>
                   </div>
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-green-200">
+                  <div className="flex items-center justify-between pt-2 border-t border-green-200">
                     <span className="text-sm font-bold text-gray-700">คะแนนรวมหลังซื้อ</span>
                     <span className="text-lg font-black text-primary">{(customer.points + earnedPoints).toLocaleString()}</span>
                   </div>
+                  {paymentMode === 'wallet' && (
+                    <div className="flex items-center justify-between pt-2 border-t border-green-200">
+                      <span className="text-sm font-bold text-gray-700">วอลเล็ตคงเหลือหลังชำระ</span>
+                      <span className={`text-lg font-black ${
+                        (customer.walletBalance || 0) >= parseFloat(amount) ? 'text-blue-600' : 'text-red-600'
+                      }`}>
+                        ฿{((customer.walletBalance || 0) - parseFloat(amount)).toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
+              {/* Wallet insufficient warning */}
+              {paymentMode === 'wallet' && amount && parseFloat(amount) > (customer.walletBalance || 0) && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-500 text-lg">warning</span>
+                  <span className="text-sm font-bold text-red-600">ยอดเงินในวอลเล็ตไม่เพียงพอ</span>
+                </div>
+              )}
+
+              {/* Checkout Button */}
               <button
                 onClick={handleCheckout}
-                disabled={loading || !amount}
-                className="w-full py-4 bg-primary text-white rounded-xl font-black text-lg hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                disabled={loading || !amount || (paymentMode === 'wallet' && parseFloat(amount) > (customer.walletBalance || 0))}
+                className={`w-full py-4 rounded-xl font-black text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                  paymentMode === 'wallet'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-700 text-white hover:brightness-110'
+                    : 'bg-primary text-white hover:brightness-110'
+                }`}
               >
                 {loading ? (
                   <>
@@ -212,51 +442,16 @@ const Cashier: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined">check_circle</span>
-                    ยืนยันการชำระเงิน
+                    <span className="material-symbols-outlined">
+                      {paymentMode === 'wallet' ? 'account_balance_wallet' : 'check_circle'}
+                    </span>
+                    {paymentMode === 'wallet' ? 'ชำระผ่านวอลเล็ต' : 'ยืนยันการชำระเงินสด'}
                   </>
                 )}
               </button>
             </div>
           </div>
         )}
-
-        {/* Messages */}
-        {error && (
-          <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 mb-4 flex items-center gap-3 animate-fade-in">
-            <span className="material-symbols-outlined text-red-600">error</span>
-            <span className="text-red-600 font-bold">{error}</span>
-          </div>
-        )}
-
-        {success && (
-          <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 mb-4 flex items-center gap-3 animate-fade-in">
-            <span className="material-symbols-outlined text-green-600">check_circle</span>
-            <span className="text-green-600 font-bold">{success}</span>
-          </div>
-        )}
-
-        {/* Quick Actions */}
-        <div className="grid grid-cols-3 gap-3">
-          <button
-            onClick={() => setAmount('100')}
-            className="p-4 bg-white rounded-xl shadow hover:shadow-lg transition-all font-bold text-gray-700"
-          >
-            100 ฿
-          </button>
-          <button
-            onClick={() => setAmount('500')}
-            className="p-4 bg-white rounded-xl shadow hover:shadow-lg transition-all font-bold text-gray-700"
-          >
-            500 ฿
-          </button>
-          <button
-            onClick={() => setAmount('1000')}
-            className="p-4 bg-white rounded-xl shadow hover:shadow-lg transition-all font-bold text-gray-700"
-          >
-            1000 ฿
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
 
 interface LoginProps {
   onLogin: () => void;
@@ -7,66 +9,73 @@ interface LoginProps {
 export default function Login({ onLogin }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement actual login logic
     if (email && password) {
-      localStorage.setItem('admin_token', 'demo_token');
-      onLogin();
+      setIsLoading(true);
+      setTimeout(() => {
+        localStorage.setItem('admin_token', 'demo_token');
+        onLogin();
+      }, 600);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-dark-green to-primary flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="material-symbols-outlined text-white text-3xl">store</span>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-800">Jespark Admin</h1>
-          <p className="text-gray-500 mt-2">เข้าสู่ระบบเพื่อจัดการ</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary flex items-center justify-center p-4">
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-20 left-20 w-72 h-72 bg-white rounded-full blur-3xl" />
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-primary-300 rounded-full blur-3xl" />
+      </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              อีเมล
-            </label>
-            <input
+      <div className="relative w-full max-w-md">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          {/* Brand */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/30">
+              <span className="material-symbols-outlined text-white text-[28px]" style={{ fontVariationSettings: "'FILL' 1, 'wght' 500" }}>store</span>
+            </div>
+            <h1 className="text-2xl font-black text-slate-900">Jespark Admin</h1>
+            <p className="text-sm text-slate-500 mt-1">เข้าสู่ระบบเพื่อจัดการร้าน</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <Input
+              label="อีเมล"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              icon="mail"
               placeholder="admin@jespark.com"
               required
             />
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              รหัสผ่าน
-            </label>
-            <input
+            <Input
+              label="รหัสผ่าน"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              icon="lock"
               placeholder="••••••••"
               required
             />
-          </div>
 
-          <button
-            type="submit"
-            className="w-full bg-primary hover:bg-dark-green text-white font-bold py-3 rounded-lg transition-colors"
-          >
-            เข้าสู่ระบบ
-          </button>
-        </form>
+            <Button type="submit" fullWidth isLoading={isLoading} icon="login" size="lg">
+              เข้าสู่ระบบ
+            </Button>
+          </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
-          Demo: ใช้อีเมลและรหัสผ่านใดก็ได้
+          <p className="text-center text-xs text-slate-400 mt-6">
+            Demo: ใช้อีเมลและรหัสผ่านใดก็ได้
+          </p>
+        </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-white/40 mt-6">
+          © 2026 Jespark · v1.0.0
         </p>
       </div>
     </div>

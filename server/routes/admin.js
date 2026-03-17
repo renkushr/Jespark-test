@@ -125,7 +125,7 @@ router.get('/customers', async (req, res) => {
       .order('created_at', { ascending: false });
 
     if (search) {
-      query = query.or(`display_name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%,member_id.ilike.%${search}%`);
+      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
     }
 
     if (tier) {
@@ -139,15 +139,12 @@ router.get('/customers', async (req, res) => {
     res.json({
       customers: users.map(user => ({
         id: user.id,
-        member_id: user.member_id,
-        display_name: user.display_name,
         name: user.name,
         email: user.email,
         phone: user.phone,
         tier: user.tier,
         points: user.points,
         wallet_balance: user.wallet_balance,
-        is_verified: user.is_verified,
         member_since: user.member_since,
         created_at: user.created_at
       })),

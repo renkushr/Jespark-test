@@ -50,7 +50,7 @@ const Coupons: React.FC = () => {
   };
 
   const offerText = (c: any) => {
-    if (c.discountType === 'percentage') return `${c.discountValue}% OFF`;
+    if (c.discountType === 'percent' || c.discountType === 'percentage') return `${c.discountValue}% OFF`;
     if (c.discountType === 'fixed') return `ลด ฿${Number(c.discountValue).toFixed(0)}`;
     return c.title || 'ส่วนลดพิเศษ';
   };

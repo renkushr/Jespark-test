@@ -1,11 +1,23 @@
 import { useState, useEffect } from 'react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+
+interface StatItem {
+  label: string;
+  value: string;
+  change: string;
+  icon: string;
+  accent: string;
+  iconBg: string;
+}
 
 export default function Dashboard() {
-  const [stats, setStats] = useState([
-    { label: 'สมาชิกทั้งหมด', value: '0', change: '+0%', icon: 'people', color: 'bg-blue-500' },
-    { label: 'ยอดขายวันนี้', value: '฿0', change: '+0%', icon: 'payments', color: 'bg-green-500' },
-    { label: 'คะแนนที่แจก', value: '0', change: '+0%', icon: 'stars', color: 'bg-yellow-500' },
-    { label: 'ของรางวัลที่แลก', value: '0', change: '+0%', icon: 'card_giftcard', color: 'bg-purple-500' },
+  const [stats, setStats] = useState<StatItem[]>([
+    { label: 'สมาชิกทั้งหมด', value: '0', change: '+0%', icon: 'people', accent: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
+    { label: 'ยอดขายวันนี้', value: '฿0', change: '+0%', icon: 'payments', accent: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
+    { label: 'คะแนนที่แจก', value: '0', change: '+0%', icon: 'stars', accent: 'border-l-warning', iconBg: 'bg-amber-50 text-warning' },
+    { label: 'ธุรกรรมวันนี้', value: '0', change: '+0%', icon: 'receipt_long', accent: 'border-l-violet-500', iconBg: 'bg-violet-50 text-violet-600' },
   ]);
   const [loading, setLoading] = useState(true);
 
@@ -15,19 +27,14 @@ export default function Dashboard() {
 
   const loadStats = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/cashier/stats`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-        },
-      });
-      
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/cashier/stats`);
       if (response.ok) {
         const data = await response.json();
         setStats([
-          { label: 'สมาชิกทั้งหมด', value: data.total.customers.toLocaleString(), change: '+12%', icon: 'people', color: 'bg-blue-500' },
-          { label: 'ยอดขายวันนี้', value: `฿${data.today.revenue.toLocaleString()}`, change: '+8%', icon: 'payments', color: 'bg-green-500' },
-          { label: 'คะแนนที่แจก', value: data.today.pointsGiven.toLocaleString(), change: '+15%', icon: 'stars', color: 'bg-yellow-500' },
-          { label: 'ของรางวัลที่แลก', value: '0', change: '+5%', icon: 'card_giftcard', color: 'bg-purple-500' },
+          { label: 'สมาชิกทั้งหมด', value: data.total.customers.toLocaleString(), change: '+12%', icon: 'people', accent: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
+          { label: 'ยอดขายวันนี้', value: `฿${data.today.revenue.toLocaleString()}`, change: '+8%', icon: 'payments', accent: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
+          { label: 'คะแนนที่แจก', value: data.today.pointsGiven.toLocaleString(), change: '+15%', icon: 'stars', accent: 'border-l-warning', iconBg: 'bg-amber-50 text-warning' },
+          { label: 'ธุรกรรมวันนี้', value: data.today.transactions.toLocaleString(), change: '+5%', icon: 'receipt_long', accent: 'border-l-violet-500', iconBg: 'bg-violet-50 text-violet-600' },
         ]);
       }
     } catch (error) {
@@ -37,72 +44,105 @@ export default function Dashboard() {
     }
   };
 
-  const recentActivities = [
-    { type: 'new_member', user: 'John Doe', action: 'สมัครสมาชิกใหม่', time: '5 นาทีที่แล้ว' },
-    { type: 'purchase', user: 'Jane Smith', action: 'ซื้อสินค้า ฿1,250', time: '15 นาทีที่แล้ว' },
-    { type: 'redeem', user: 'Bob Johnson', action: 'แลก Starbucks Coffee', time: '30 นาทีที่แล้ว' },
-    { type: 'points', user: 'Alice Brown', action: 'ได้รับ 150 คะแนน', time: '1 ชั่วโมงที่แล้ว' },
-  ];
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+
+  const loadRecentActivities = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/admin/transactions/recent?limit=10`);
+      if (response.ok) {
+        const data = await response.json();
+        setRecentActivities((data.transactions || []).map((t: any) => ({
+          icon: 'shopping_cart',
+          user: t.customerName || 'ลูกค้า',
+          action: `฿${parseFloat(t.amount).toLocaleString()} · +${t.points} คะแนน`,
+          time: new Date(t.createdAt).toLocaleString('th-TH', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }),
+          badge: 'primary' as const,
+        })));
+      }
+    } catch (error) { console.error('Error loading activities:', error); }
+  };
+
+  useEffect(() => { loadRecentActivities(); }, []);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-gray-800">Dashboard</h1>
-        <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-dark-green transition-colors">
-          <span className="material-symbols-outlined">download</span>
+      {/* Page header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-slate-900">Dashboard</h1>
+          <p className="text-sm text-slate-500 mt-0.5">ภาพรวมระบบ Jespark Rewards</p>
+        </div>
+        <Button variant="outline" icon="download" size="sm">
           Export Report
-        </button>
+        </Button>
       </div>
 
       {/* Stats Cards */}
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center gap-3">
+            <span className="material-symbols-outlined text-primary text-4xl animate-spin">progress_activity</span>
+            <p className="text-sm text-slate-400">กำลังโหลดข้อมูล...</p>
+          </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {stats.map((stat, index) => (
-          <div key={index} className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <div className={`${stat.color} w-12 h-12 rounded-lg flex items-center justify-center`}>
-                <span className="material-symbols-outlined text-white">{stat.icon}</span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {stats.map((stat, index) => (
+            <div key={index} className={`bg-white rounded-2xl border border-slate-200 shadow-sm p-5 border-l-4 ${stat.accent}`}>
+              <div className="flex items-center justify-between mb-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
+                  <span className="material-symbols-outlined text-[20px]">{stat.icon}</span>
+                </div>
+                <Badge variant="success" hasDot>{stat.change}</Badge>
               </div>
-              <span className="text-green-600 text-sm font-semibold">{stat.change}</span>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
+              <p className="text-2xl font-black text-slate-900 mt-1">{stat.value}</p>
             </div>
-            <h3 className="text-gray-600 text-sm font-medium">{stat.label}</h3>
-            <p className="text-3xl font-bold text-gray-800 mt-2">{stat.value}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Chart Placeholder */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">ยอดขายรายเดือน</h2>
-          <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg">
-            <p className="text-gray-400">Chart will be here</p>
+        <Card title="ยอดขายรายเดือน" action={
+          <select className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20">
+            <option>7 วัน</option>
+            <option>30 วัน</option>
+            <option>90 วัน</option>
+          </select>
+        }>
+          <div className="h-64 flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-slate-300 text-4xl">bar_chart</span>
+              <p className="text-sm text-slate-400 mt-2">กราฟจะแสดงที่นี่</p>
+            </div>
           </div>
-        </div>
+        </Card>
 
         {/* Recent Activities */}
-        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">กิจกรรมล่าสุด</h2>
-          <div className="space-y-4">
-            {recentActivities.map((activity, index) => (
-              <div key={index} className="flex items-start gap-3 pb-4 border-b border-gray-100 last:border-0">
-                <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="material-symbols-outlined text-gray-600 text-sm">person</span>
+        <Card title="กิจกรรมล่าสุด" action={
+          <Button variant="ghost" size="sm">ดูทั้งหมด</Button>
+        }>
+          <div className="space-y-1">
+            {recentActivities.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8">
+                <span className="material-symbols-outlined text-slate-300 text-4xl">receipt_long</span>
+                <p className="text-sm text-slate-400 mt-2">ยังไม่มีกิจกรรมล่าสุด</p>
+              </div>
+            ) : recentActivities.map((activity, index) => (
+              <div key={index} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors">
+                <div className="w-9 h-9 bg-slate-100 rounded-lg flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-slate-500 text-[18px]">{activity.icon}</span>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-800">{activity.user}</p>
-                  <p className="text-sm text-gray-600">{activity.action}</p>
-                  <p className="text-xs text-gray-400 mt-1">{activity.time}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slate-800">{activity.user}</p>
+                  <p className="text-xs text-slate-500 truncate">{activity.action}</p>
                 </div>
+                <p className="text-[10px] font-medium text-slate-400 shrink-0">{activity.time}</p>
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

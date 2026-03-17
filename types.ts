@@ -3,9 +3,11 @@ export interface User {
   name: string;
   tier: 'Platinum' | 'Gold' | 'Silver' | 'Member';
   memberSince: string;
+  memberId: string;
   points: number;
   walletBalance: number;
   avatar: string;
+  needsProfile?: boolean;
 }
 
 export interface Reward {

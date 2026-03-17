@@ -217,6 +217,22 @@ class ApiClient {
     });
   }
 
+  async scanLookup(memberId: string) {
+    return this.request<{ user: any }>(`/cashier/scan-lookup?memberId=${encodeURIComponent(memberId)}`);
+  }
+
+  async walletPay(customerId: number, amount: number) {
+    return this.request<{
+      message: string;
+      earnedPoints: number;
+      totalPoints: number;
+      walletBalance: number;
+    }>('/cashier/wallet-pay', {
+      method: 'POST',
+      body: JSON.stringify({ customerId, amount }),
+    });
+  }
+
   async getCashierStats() {
     return this.request<{
       today: {

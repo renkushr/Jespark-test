@@ -1,15 +1,49 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../src/api/client';
 
 const StoreFinder: React.FC = () => {
   const navigate = useNavigate();
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const stores = [
-    { id: 1, name: 'Jespark Central Plaza', dist: '0.8km', addr: '123 Market Street, Downtown', status: 'Open', closing: '10:00 PM', primary: true },
-    { id: 2, name: 'Jespark Westside', dist: '2.4km', addr: '456 West Avenue, District 4', status: 'Closes Soon', closing: '9:00 PM' },
-    { id: 3, name: 'Jespark North Hub', dist: '5.1km', addr: '789 North Boulevard', status: 'Closed', next: '8:00 AM Tomorrow' }
-  ];
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        const res = await apiClient.getStores();
+        const list = (res.stores || []).map((s: any, i: number) => ({
+          id: s.id,
+          name: s.name,
+          addr: s.address || '',
+          phone: s.phone || '',
+          dist: '',
+          status: 'Open',
+          primary: i === 0,
+          openingHours: s.openingHours || '',
+        }));
+        if (list.length === 0) {
+          // Fallback hardcoded stores if API returns empty
+          setStores([
+            { id: 1, name: 'Jespark Central Plaza', dist: '0.8km', addr: '123 Market Street, Downtown', status: 'Open', primary: true },
+            { id: 2, name: 'Jespark Westside', dist: '2.4km', addr: '456 West Avenue, District 4', status: 'Open' },
+            { id: 3, name: 'Jespark North Hub', dist: '5.1km', addr: '789 North Boulevard', status: 'Closed' },
+          ]);
+        } else {
+          setStores(list);
+        }
+      } catch {
+        setStores([
+          { id: 1, name: 'Jespark Central Plaza', dist: '0.8km', addr: '123 Market Street, Downtown', status: 'Open', primary: true },
+          { id: 2, name: 'Jespark Westside', dist: '2.4km', addr: '456 West Avenue, District 4', status: 'Open' },
+          { id: 3, name: 'Jespark North Hub', dist: '5.1km', addr: '789 North Boulevard', status: 'Closed' },
+        ]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 animate-fade-in overflow-hidden relative">
@@ -70,7 +104,7 @@ const StoreFinder: React.FC = () => {
         <div className="px-6 pb-4 flex justify-between items-end shrink-0">
            <div>
              <h3 className="text-xl font-black tracking-tight">Nearby Stores</h3>
-             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5">3 locations nearby</p>
+             <p className="text-xs text-gray-400 font-bold uppercase tracking-wider mt-0.5">{stores.length} locations nearby</p>
            </div>
            <button className="text-primary text-[10px] font-black uppercase tracking-widest mb-1">View List</button>
         </div>

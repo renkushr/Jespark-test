@@ -42,3 +42,8 @@ coverage/
 .temp/
 temp/
 tmp/
+
+# Local Netlify folder
+.netlify
+
+.vercel

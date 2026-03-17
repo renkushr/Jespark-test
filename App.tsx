@@ -22,6 +22,7 @@ import Cashier from './screens/Cashier';
 import AdminLogin from './screens/AdminLogin';
 import AdminDashboard from './screens/AdminDashboard';
 import Navbar from './components/Navbar';
+import PhonePopup from './components/PhonePopup';
 
 /** LIFF init timeout (ms) — บางเครื่องมือถือ/เบราว์เซอร์ LIFF ค้าง ให้โชว์แอปหลัง timeout */
 const LIFF_INIT_TIMEOUT_MS = 10000;
@@ -62,7 +63,14 @@ const useLiffReady = (): { ready: boolean; liffFailed?: boolean } => {
 };
 
 const AppRoutes: React.FC = () => {
-  const { isLoggedIn, user, logout, updateUser } = useAuth();
+  const { isLoggedIn, user, logout, updateUser, refreshUser } = useAuth();
+  const [showPhonePopup, setShowPhonePopup] = useState(false);
+
+  useEffect(() => {
+    if (isLoggedIn && user && user.needsProfile) {
+      setShowPhonePopup(true);
+    }
+  }, [isLoggedIn, user]);
 
   return (
     <div className="min-h-screen font-sans flex justify-center py-0 md:py-8">
@@ -106,6 +114,17 @@ const AppRoutes: React.FC = () => {
           </Routes>
         </div>
         {isLoggedIn && <Navbar />}
+
+        {/* Phone popup after login */}
+        {showPhonePopup && user && (
+          <PhonePopup
+            userName={user.name}
+            onComplete={async () => {
+              setShowPhonePopup(false);
+              await refreshUser();
+            }}
+          />
+        )}
       </div>
     </div>
   );

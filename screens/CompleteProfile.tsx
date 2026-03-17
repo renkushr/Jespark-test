@@ -1,6 +1,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../src/api/client';
+import { useAuth } from '../src/context/AuthContext';
 
 interface CompleteProfileProps {
   onComplete: () => void;
@@ -8,18 +10,30 @@ interface CompleteProfileProps {
 
 const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
     birthdate: '',
     gender: ''
   });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would involve API calls to save the data
-    onComplete();
-    navigate('/');
+    try {
+      setSaving(true);
+      setError('');
+      await apiClient.updateProfile(formData.fullName, formData.phone, formData.birthdate || undefined);
+      await refreshUser();
+      onComplete();
+      navigate('/');
+    } catch (err: any) {
+      setError(err.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // Calculate progress based on filled fields
@@ -161,15 +175,31 @@ const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
             </div>
           </div>
 
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm text-center font-bold">
+              {error}
+            </div>
+          )}
+
           {/* Action Button */}
           <div className="pt-8">
             <button 
               type="submit"
-              disabled={!isFormValid}
-              className={`w-full h-14 rounded-xl font-black text-base transition-all shadow-xl flex items-center justify-center gap-3 ${isFormValid ? 'bg-dark-green text-white shadow-dark-green/20 active:scale-[0.98] hover:bg-black' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
+              disabled={!isFormValid || saving}
+              className={`w-full h-14 rounded-xl font-black text-base transition-all shadow-xl flex items-center justify-center gap-3 ${isFormValid && !saving ? 'bg-dark-green text-white shadow-dark-green/20 active:scale-[0.98] hover:bg-black' : 'bg-gray-100 text-gray-300 cursor-not-allowed'}`}
             >
-              <span>บันทึกข้อมูลและเข้าสู่ระบบ</span>
-              <span className="material-symbols-outlined font-black text-xl">security</span>
+              {saving ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                  <span>กำลังบันทึก...</span>
+                </>
+              ) : (
+                <>
+                  <span>บันทึกข้อมูลและเข้าสู่ระบบ</span>
+                  <span className="material-symbols-outlined font-black text-xl">security</span>
+                </>
+              )}
             </button>
             <div className="flex items-center justify-center gap-2 mt-6 opacity-40">
               <span className="material-symbols-outlined text-sm">verified_user</span>
