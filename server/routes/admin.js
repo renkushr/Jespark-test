@@ -59,7 +59,7 @@ router.get('/users', async (req, res) => {
 
     const { data: users, error, count } = await supabase
       .from('users')
-      .select('*', { count: 'exact' })
+      .select('id, name, email, phone, tier, points, wallet_balance, member_since, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -121,7 +121,7 @@ router.get('/customers', async (req, res) => {
 
     let query = supabase
       .from('users')
-      .select('*', { count: 'exact' })
+      .select('id, name, email, phone, tier, points, wallet_balance, member_since, created_at', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (search) {
@@ -162,7 +162,7 @@ router.get('/customers/:id', async (req, res) => {
     const { id } = req.params;
     const { data: user, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, name, email, phone, tier, points, wallet_balance, member_since, avatar, birth_date, created_at')
       .eq('id', parseInt(id))
       .single();
 
@@ -173,16 +173,15 @@ router.get('/customers/:id', async (req, res) => {
     res.json({
       customer: {
         id: user.id,
-        member_id: user.member_id,
-        display_name: user.display_name,
         name: user.name,
         email: user.email,
         phone: user.phone,
         tier: user.tier,
         points: user.points,
         wallet_balance: user.wallet_balance,
-        is_verified: user.is_verified,
         member_since: user.member_since,
+        avatar: user.avatar,
+        birth_date: user.birth_date,
         created_at: user.created_at
       }
     });
@@ -496,7 +495,7 @@ router.get('/reports/members', async (req, res) => {
 
     const { data: users, error } = await supabase
       .from('users')
-      .select('*')
+      .select('id, tier, created_at')
       .gte('created_at', start)
       .lte('created_at', end)
       .order('created_at', { ascending: true });

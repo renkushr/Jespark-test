@@ -600,7 +600,7 @@ export default function ReceiptScanner() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="ค้นหาด้วยชื่อ, เบอร์โทร, หรือ Member ID..."
+                    placeholder="ค้นหาด้วยชื่อ หรือ เบอร์โทร..."
                     className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
                   />
                   {searching && (
@@ -621,7 +621,7 @@ export default function ReceiptScanner() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-bold text-slate-800 text-sm truncate">{c.name}</p>
-                          <p className="text-[10px] text-slate-400 truncate">{c.memberId} · {c.phone || c.email || '-'}</p>
+                          <p className="text-[10px] text-slate-400 truncate">{c.phone ? c.phone : ''}{c.phone && c.email ? ' · ' : ''}{c.email || (!c.phone ? '-' : '')}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-[10px] font-bold text-primary">{c.points?.toLocaleString()} แต้ม</p>

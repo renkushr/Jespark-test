@@ -27,16 +27,36 @@ async function testConnection() {
     console.log('   Sample:', stores[0]?.name);
 
     // Test 3: Count users
-    console.log('\n3️⃣ Testing users table...');
+    console.log('\n3️⃣ Testing users table (count)...');
     const { count, error: countError } = await supabase
       .from('users')
       .select('*', { count: 'exact', head: true });
 
-    if (countError) throw countError;
-    console.log('✅ Users:', count, 'users');
+    if (countError) { console.error('❌ Count error:', countError.message); }
+    else { console.log('✅ Users count:', count); }
 
-    console.log('\n🎉 Supabase connection successful!');
-    console.log('✅ All tables are working correctly');
+    // Test 4: Read users data
+    console.log('\n4️⃣ Testing users table (select data)...');
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, name, email, phone, tier, points')
+      .limit(3);
+
+    if (usersError) { console.error('❌ Users read error:', usersError.message); }
+    else { console.log('✅ Users data:', users.length, 'rows'); users.forEach(u => console.log('  -', u.name, u.email, u.phone)); }
+
+    // Test 5: Search users
+    console.log('\n5️⃣ Testing users search...');
+    const { data: searched, error: searchError } = await supabase
+      .from('users')
+      .select('id, name, email, phone')
+      .or('name.ilike.%test%,email.ilike.%test%,phone.ilike.%test%')
+      .limit(3);
+
+    if (searchError) { console.error('❌ Search error:', searchError.message); }
+    else { console.log('✅ Search results:', searched.length, 'rows'); }
+
+    console.log('\n🎉 Test complete!');
     
   } catch (error) {
     console.error('\n❌ Supabase connection failed:');
