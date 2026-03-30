@@ -328,6 +328,51 @@ CREATE INDEX IF NOT EXISTS idx_admin_logs_action ON admin_logs(action);
 CREATE INDEX IF NOT EXISTS idx_admin_logs_category ON admin_logs(category);
 CREATE INDEX IF NOT EXISTS idx_admin_logs_created_at ON admin_logs(created_at DESC);
 
+-- Banners (hero slider — recommended 1200×480px, 5:2 ratio)
+CREATE TABLE IF NOT EXISTS banners (
+  id BIGSERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  subtitle TEXT DEFAULT '',
+  image_url TEXT NOT NULL,
+  button_text VARCHAR(100) DEFAULT 'ดูรายละเอียด',
+  link_type VARCHAR(50) DEFAULT 'rewards',
+  gradient_color VARCHAR(100) DEFAULT 'from-dark-green/90 to-transparent',
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Brand Icons (circular logos — recommended 200×200px, 1:1)
+CREATE TABLE IF NOT EXISTS brand_icons (
+  id BIGSERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  logo_url TEXT NOT NULL,
+  link_url VARCHAR(255) DEFAULT '/rewards',
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Deals (promotion cards — recommended 560×315px, 16:9)
+CREATE TABLE IF NOT EXISTS deals (
+  id BIGSERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  subtitle TEXT DEFAULT '',
+  tag VARCHAR(100) DEFAULT '',
+  image_url TEXT NOT NULL,
+  link_url VARCHAR(255) DEFAULT '/rewards',
+  sort_order INTEGER DEFAULT 0,
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_banners_active_sort ON banners(is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_brand_icons_active_sort ON brand_icons(is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_deals_active_sort ON deals(is_active, sort_order);
+
 INSERT INTO stores (name, address, phone, latitude, longitude, is_active) VALUES
   ('Jespark Central World', '999/9 Rama I Rd, Pathum Wan, Bangkok', '02-123-4567', 13.7467, 100.5398, true),
   ('Jespark Siam Paragon', '991 Rama I Rd, Pathum Wan, Bangkok', '02-234-5678', 13.7465, 100.5347, true),

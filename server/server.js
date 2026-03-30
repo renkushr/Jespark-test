@@ -18,6 +18,7 @@ import cashierRoutes from './routes/cashier.js';
 import adminRoutes from './routes/admin.js';
 import settingsRoutes from './routes/settings.js';
 import slipCashierRoutes from './routes/slipCashier.js';
+import contentRoutes from './routes/content.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { 
   sanitizeInput, 
@@ -122,6 +123,7 @@ app.use('/api/cashier', cashierRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/slip-cashier', slipCashierRoutes);
+app.use('/api/content', contentRoutes);
 
 app.use((err, req, res, next) => {
   console.error('Error:', err);

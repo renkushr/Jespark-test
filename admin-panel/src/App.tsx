@@ -16,6 +16,7 @@ import Coupons from './pages/Coupons';
 import SlipLog from './pages/SlipLog';
 import ReceiptScanner from './pages/ReceiptScanner';
 import AuditLogs from './pages/AuditLogs';
+import ContentManager from './pages/ContentManager';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -61,6 +62,7 @@ function App() {
           <Route path="/slip-log" element={<SlipLog />} />
           <Route path="/receipt-scanner" element={<ReceiptScanner />} />
           <Route path="/audit-logs" element={<AuditLogs />} />
+          <Route path="/content" element={<ContentManager />} />
         </Routes>
       </Layout>
     </BrowserRouter>
