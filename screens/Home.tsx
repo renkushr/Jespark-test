@@ -136,7 +136,7 @@ const Home: React.FC<HomeProps> = ({ user }) => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
-            <button className="flex items-center justify-center text-gray-400 hover:text-primary transition-colors">
+            <button type="button" onClick={() => navigate('/scan')} className="flex items-center justify-center text-gray-400 hover:text-primary transition-colors">
               <span className="material-symbols-outlined text-xl">photo_camera</span>
             </button>
           </div>
@@ -255,7 +255,7 @@ const Home: React.FC<HomeProps> = ({ user }) => {
         </div>
         <div className="flex overflow-x-auto no-scrollbar gap-5 pb-2">
           {recommendedBrands.map((brand) => (
-            <div key={brand.id} className="flex flex-col items-center gap-2 shrink-0 active:scale-90 transition-transform cursor-pointer">
+            <div key={brand.id} role="button" tabIndex={0} onClick={() => navigate('/rewards')} onKeyDown={(e) => e.key === 'Enter' && navigate('/rewards')} className="flex flex-col items-center gap-2 shrink-0 active:scale-90 transition-transform cursor-pointer">
               <div className="size-16 rounded-full overflow-hidden border border-gray-100 shadow-sm bg-white/80 backdrop-blur-sm">
                 <div 
                   className="size-full bg-center bg-no-repeat bg-cover" 
@@ -276,7 +276,7 @@ const Home: React.FC<HomeProps> = ({ user }) => {
       <div className="flex overflow-x-auto no-scrollbar snap-x snap-mandatory">
         <div className="flex px-4 pt-2 gap-4 pb-4">
           {deals.map((deal) => (
-            <div key={deal.id} className="flex flex-col gap-3 rounded-xl min-w-[280px] snap-center">
+            <div key={deal.id} role="button" tabIndex={0} onClick={() => navigate('/rewards')} onKeyDown={(e) => e.key === 'Enter' && navigate('/rewards')} className="flex flex-col gap-3 rounded-xl min-w-[280px] snap-center cursor-pointer">
               <div 
                 className="w-full bg-center bg-no-repeat aspect-[16/9] bg-cover rounded-xl shadow-md border border-gray-100 overflow-hidden" 
                 style={{ backgroundImage: `url(${deal.image})` }}

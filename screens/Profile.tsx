@@ -17,15 +17,15 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
       title: 'บัญชี',
       items: [
         { label: 'ตั้งค่าบัญชี', icon: 'person_outline', path: '/settings' },
-        { label: 'ภาษา', icon: 'translate', value: 'ไทย' },
-        { label: 'ความปลอดภัยและรหัส PIN', icon: 'lock_person' },
+        { label: 'ภาษา', icon: 'translate', value: 'ไทย', onClick: () => alert('ขณะนี้รองรับภาษาไทยเท่านั้น') },
+        { label: 'ความปลอดภัยและรหัส PIN', icon: 'lock_person', onClick: () => alert('ฟีเจอร์รหัส PIN จะเปิดใช้งานเร็วๆ นี้') },
       ]
     },
     {
       title: 'ช่วยเหลือ',
       items: [
-        { label: 'นโยบายความเป็นส่วนตัว', icon: 'policy' },
-        { label: 'ศูนย์ความช่วยเหลือ', icon: 'help_outline' },
+        { label: 'นโยบายความเป็นส่วนตัว', icon: 'policy', onClick: () => window.open('https://jespark.com/privacy', '_blank') },
+        { label: 'ศูนย์ความช่วยเหลือ', icon: 'help_outline', onClick: () => window.open('https://jespark.com/help', '_blank') },
       ]
     }
   ];
@@ -40,7 +40,7 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
       </header>
 
       <div className="flex flex-col items-center py-8 gap-4">
-        <div className="relative">
+        <div className="relative cursor-pointer" onClick={() => navigate('/settings')}>
           <div className="size-32 rounded-full border-4 border-primary/20 p-1">
              <div 
                className="size-full rounded-full bg-cover bg-center shadow-lg" 
@@ -69,7 +69,10 @@ const Profile: React.FC<ProfileProps> = ({ user, onLogout }) => {
               {section.items.map((item, idx) => (
                 <div 
                   key={item.label}
-                  onClick={() => item.path && navigate(item.path)}
+                  onClick={() => {
+                    if (item.onClick) item.onClick();
+                    else if (item.path) navigate(item.path);
+                  }}
                   className={`flex items-center justify-between p-4 cursor-pointer active:bg-gray-50 transition-colors ${idx !== section.items.length - 1 ? 'border-b border-gray-50' : ''}`}
                 >
                   <div className="flex items-center gap-4">

@@ -54,6 +54,33 @@ const Wallet: React.FC<WalletProps> = ({ user }) => {
     return db - da;
   });
 
+  const handleTopup = async () => {
+    const amount = parseFloat(topupAmount);
+    if (!amount || amount <= 0 || amount > 50000) {
+      setTopupError('กรุณาใส่จำนวนเงิน 1 - 50,000 บาท');
+      return;
+    }
+    try {
+      setTopupLoading(true);
+      setTopupError('');
+      await apiClient.topUp(amount);
+      setTopupSuccess(true);
+      setTopupAmount('');
+      const res = await apiClient.getTransactions(50, 0);
+      setTransactions(res.transactions || []);
+    } catch (err: any) {
+      setTopupError(err.message || 'เติมเงินไม่สำเร็จ');
+    } finally {
+      setTopupLoading(false);
+    }
+  };
+
+  const walletActions = [
+    { label: 'เติมเงิน', icon: 'add_circle', color: 'bg-primary/10 text-primary', onClick: () => { setShowTopup(true); setTopupSuccess(false); setTopupError(''); setTopupAmount(''); } },
+    { label: 'โอนเงิน', icon: 'send', color: 'bg-primary text-dark-green shadow-lg shadow-primary/20', onClick: () => navigate('/history') },
+    { label: 'ถอนเงิน', icon: 'account_balance_wallet', color: 'bg-primary/10 text-primary', onClick: () => navigate('/history') },
+  ];
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 animate-fade-in">
       <header className="bg-dark-green text-white pt-10 pb-8 px-4 rounded-b-[2.5rem] shadow-xl relative z-20">

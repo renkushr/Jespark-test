@@ -1,9 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const ForgotPassword: React.FC = () => {
   const navigate = useNavigate();
+  const [contact, setContact] = useState('');
+  const [submitted, setSubmitted] = useState(false);
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 animate-fade-in p-6">
@@ -32,27 +34,47 @@ const ForgotPassword: React.FC = () => {
           </div>
 
           <div className="w-full space-y-6 mt-4">
-             <div className="space-y-3">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Registered Mobile or Email</label>
-                <div className="relative">
-                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
-                      <span className="material-symbols-outlined">contact_mail</span>
-                   </div>
-                   <input 
-                     className="w-full bg-white border border-gray-100 rounded-2xl pl-14 pr-6 py-5 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
-                     placeholder="e.g. alex@example.com"
-                   />
+             {submitted ? (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-6 text-center">
+                   <p className="text-sm font-bold text-dark-green leading-relaxed">
+                      ระบบจะส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมล/เบอร์โทรของคุณ กรุณาตรวจสอบ
+                   </p>
                 </div>
-             </div>
+             ) : (
+                <div className="space-y-3">
+                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-2">Registered Mobile or Email</label>
+                   <div className="relative">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                         <span className="material-symbols-outlined">contact_mail</span>
+                      </div>
+                      <input 
+                        value={contact}
+                        onChange={(e) => setContact(e.target.value)}
+                        className="w-full bg-white border border-gray-100 rounded-2xl pl-14 pr-6 py-5 text-sm font-bold shadow-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all" 
+                        placeholder="e.g. alex@example.com"
+                      />
+                   </div>
+                </div>
+             )}
           </div>
        </div>
 
+       {!submitted && (
        <div className="pt-10 pb-4">
-          <button className="w-full bg-primary hover:bg-primary-dark text-dark-green font-black text-lg py-5 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-transform">
+          <button
+            type="button"
+            onClick={() => {
+              if (contact.trim()) {
+                setSubmitted(true);
+              }
+            }}
+            className="w-full bg-primary hover:bg-primary-dark text-dark-green font-black text-lg py-5 rounded-2xl shadow-xl shadow-primary/20 flex items-center justify-center gap-2 active:scale-95 transition-transform"
+          >
              <span>Submit</span>
              <span className="material-symbols-outlined font-black">arrow_forward</span>
           </button>
        </div>
+       )}
     </div>
   );
 };

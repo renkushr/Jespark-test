@@ -134,14 +134,14 @@ const Login: React.FC = () => {
           
           <div className="px-6 text-center border-t border-gray-50 pt-8">
             <p className="text-[10px] text-gray-400 leading-relaxed font-bold uppercase tracking-tighter">
-              โดยการเข้าใช้งาน คุณยอมรับ <button className="text-dark-green underline underline-offset-2">เงื่อนไขการใช้งาน</button> <br/>และ <button className="text-dark-green underline underline-offset-2">นโยบายความเป็นส่วนตัว</button>
+              โดยการเข้าใช้งาน คุณยอมรับ <button type="button" onClick={() => window.open('https://jespark.com/terms', '_blank')} className="text-dark-green underline underline-offset-2">เงื่อนไขการใช้งาน</button> <br/>และ <button type="button" onClick={() => window.open('https://jespark.com/privacy', '_blank')} className="text-dark-green underline underline-offset-2">นโยบายความเป็นส่วนตัว</button>
             </p>
           </div>
         </div>
 
         {/* Help Center with premium touch */}
         <div className="mt-12">
-          <button className="flex items-center gap-2 text-gray-300 hover:text-primary transition-colors py-2 px-5 rounded-full text-[11px] font-black uppercase tracking-widest border border-gray-100">
+          <button type="button" onClick={() => window.open('https://jespark.com/help', '_blank')} className="flex items-center gap-2 text-gray-300 hover:text-primary transition-colors py-2 px-5 rounded-full text-[11px] font-black uppercase tracking-widest border border-gray-100">
             <span className="material-symbols-outlined text-sm">support_agent</span>
             ศูนย์ช่วยเหลือ
           </button>

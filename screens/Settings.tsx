@@ -16,6 +16,7 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser }) => {
   const [email, setEmail] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [notifSettings, setNotifSettings] = useState({ push: true, newsletter: false, sms: false });
 
   const handleSave = async () => {
     try {
@@ -41,11 +42,17 @@ const Settings: React.FC<SettingsProps> = ({ user, setUser }) => {
           <h2 className="text-lg font-bold">ตั้งค่าบัญชี</h2>
           <button onClick={handleSave} className="text-primary font-black text-sm uppercase tracking-widest px-2">บันทึก</button>
         </div>
+        {error && (
+          <p className="text-red-500 text-xs font-bold text-center mt-2 px-2">{error}</p>
+        )}
       </header>
 
       <div className="p-6 space-y-8">
         <div className="flex flex-col items-center">
-          <div className="relative group cursor-pointer">
+          <div
+            className="relative group cursor-pointer"
+            onClick={() => alert('ฟีเจอร์อัพโหลดรูปภาพจะเปิดใช้งานเร็วๆ นี้')}
+          >
             <div className="size-32 rounded-full border-4 border-primary/20 p-1 bg-white">
               <div 
                 className="size-full rounded-full bg-cover bg-center shadow-2xl" 
