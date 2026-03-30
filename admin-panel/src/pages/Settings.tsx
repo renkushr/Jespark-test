@@ -26,13 +26,15 @@ export default function Settings() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
   useEffect(() => { loadSettings(); }, []);
 
   const loadSettings = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/settings`);
+      const response = await fetch(`${API_BASE}/settings`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         setSettings(data.settings);
@@ -60,7 +62,7 @@ export default function Settings() {
       if (changedSettings.length === 0) { showError('ไม่มีการเปลี่ยนแปลง'); setSaving(false); return; }
       const response = await fetch(`${API_BASE}/settings`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ settings: changedSettings }),
       });
       if (response.ok) { const data = await response.json(); showSuccess(`บันทึกสำเร็จ ${data.summary.successful} รายการ`); loadSettings(); }
@@ -84,7 +86,7 @@ export default function Settings() {
 
   const getSettingLabel = (key: string) => {
     const labels: Record<string, string> = {
-      'points_earn_rate': 'อัตราการให้คะแนน (%)', 'points_value': 'มูลค่า 1 คะแนน (บาท)',
+      'points_earn_rate': 'อัตราการให้คะแนน (%)', 'points_value': 'จำนวนคะแนนต่อ 1 บาท',
       'points_expiry_days': 'คะแนนหมดอายุ (วัน)', 'points_min_use': 'คะแนนขั้นต่ำที่ใช้ได้',
       'points_max_use_per_transaction': 'คะแนนสูงสุดต่อครั้ง', 'points_max_discount_percent': 'ส่วนลดสูงสุด (%)',
       'tier_bronze_min_points': 'Bronze - คะแนนขั้นต่ำ', 'tier_silver_min_points': 'Silver - คะแนนขั้นต่ำ',
@@ -219,7 +221,7 @@ export default function Settings() {
                     <span className="text-slate-500">คะแนนที่ได้รับ</span>
                     <span className="text-lg font-black text-primary">{Math.floor(1000 * (editedValues['points_earn_rate'] / 100))} คะแนน</span>
                   </div>
-                  <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-slate-500">ใช้คะแนน 100</span><span className="font-bold text-success">ส่วนลด {100 * editedValues['points_value']} บาท</span></div>
+                  <div className="flex justify-between pt-2 border-t border-slate-100"><span className="text-slate-500">ใช้คะแนน 100</span><span className="font-bold text-success">ส่วนลด {(100 / (editedValues['points_value'] || 100)).toFixed(2)} บาท</span></div>
                 </div>
               </Card>
             </div>

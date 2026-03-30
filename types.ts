@@ -7,6 +7,7 @@ export interface User {
   points: number;
   walletBalance: number;
   avatar: string;
+  phone?: string;
   needsProfile?: boolean;
 }
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import supabase from '../config/supabase.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
+import { logLogin } from '../utils/adminLogger.js';
 import { registerValidator, loginValidator, lineLoginValidator } from '../middleware/validator.js';
 
 const router = express.Router();
@@ -42,24 +43,32 @@ router.post('/register', authLimiter, registerValidator, async (req, res) => {
 
     const memberId = await generateMemberId();
 
-    // Create new user
-    const { data: newUser, error: insertError } = await supabase
+    const insertData = {
+      email,
+      password: hashedPassword,
+      name,
+      phone: phone || null,
+      birth_date: birthDate || null,
+      member_since: memberSince,
+      avatar: defaultAvatar,
+      tier: 'Member',
+      points: 0,
+      wallet_balance: 0,
+    };
+    if (memberId) insertData.member_id = memberId;
+
+    let { data: newUser, error: insertError } = await supabase
       .from('users')
-      .insert({
-        email,
-        password: hashedPassword,
-        name,
-        phone: phone || null,
-        birth_date: birthDate || null,
-        member_since: memberSince,
-        avatar: defaultAvatar,
-        tier: 'Member',
-        points: 0,
-        wallet_balance: 0,
-        member_id: memberId
-      })
+      .insert(insertData)
       .select()
       .single();
+
+    if (insertError && memberId) {
+      delete insertData.member_id;
+      const retry = await supabase.from('users').insert(insertData).select().single();
+      newUser = retry.data;
+      insertError = retry.error;
+    }
 
     if (insertError) throw insertError;
 
@@ -209,8 +218,11 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       user = newUser;
     } else {
       // อัปเดตข้อมูล profile จาก LINE (ถ้ามีการเปลี่ยนแปลง)
+      // แต่ไม่ทับชื่อภาษาไทยที่ user กรอกไว้แล้วด้วยชื่อ LINE
+      const THAI_CHECK = /^[ก-๏\s]+$/;
+      const userHasThaiName = user.name && THAI_CHECK.test(user.name.trim()) && user.name.trim().includes(' ');
       const updates = {};
-      if (name && name !== user.name) updates.name = name;
+      if (name && name !== user.name && !userHasThaiName) updates.name = name;
       if (pictureUrl && pictureUrl !== user.avatar) updates.avatar = pictureUrl;
       if (email && email !== user.email) updates.email = email;
       
@@ -238,8 +250,10 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       { expiresIn: '30d' }
     );
 
-    // Check if user needs to complete profile (no phone = new user)
-    const needsProfile = !user.phone;
+    // Check if user needs to complete profile (no phone OR name is not Thai)
+    const THAI_NAME_REGEX = /^[ก-๏\s]+$/;
+    const hasThaiName = user.name && THAI_NAME_REGEX.test(user.name.trim()) && user.name.trim().includes(' ');
+    const needsProfile = !user.phone || !hasThaiName;
 
     res.json({
       message: 'LINE login successful',
@@ -264,6 +278,62 @@ router.post('/line-login', authLimiter, lineLoginValidator, async (req, res) => 
       ? error.message
       : 'Internal server error';
     res.status(500).json({ error: message });
+  }
+});
+
+// Admin Login
+router.post('/admin-login', authLimiter, loginValidator, async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single();
+
+    if (userError || !user) {
+      logLogin(req, { adminId: null, email, success: false, reason: 'user_not_found' });
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      logLogin(req, { adminId: user.id, email, success: false, reason: 'wrong_password' });
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    const adminEmails = (process.env.ADMIN_EMAILS || 'admin@jespark.com').split(',').map(e => e.trim().toLowerCase());
+    if (!adminEmails.includes(email.toLowerCase())) {
+      logLogin(req, { adminId: user.id, email, success: false, reason: 'not_admin' });
+      return res.status(403).json({ error: 'This account does not have admin privileges' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: 'admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '12h' }
+    );
+
+    logLogin(req, { adminId: user.id, email: user.email, success: true });
+
+    res.json({
+      message: 'Admin login successful',
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: 'admin'
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

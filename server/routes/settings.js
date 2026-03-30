@@ -1,8 +1,11 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateAdmin } from '../middleware/auth.js';
+import { logAdminAction } from '../utils/adminLogger.js';
 
 const router = express.Router();
+
+router.use(authenticateAdmin);
 
 // Get all settings
 router.get('/', async (req, res) => {
@@ -21,7 +24,16 @@ router.get('/', async (req, res) => {
 
     const { data: settings, error } = await query;
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42P01' || error.message?.includes('does not exist')) {
+        return res.json({ settings: {}, raw: [], message: 'system_settings table not created yet' });
+      }
+      throw error;
+    }
+
+    if (!settings || settings.length === 0) {
+      return res.json({ settings: {}, raw: [] });
+    }
 
     // Group by category
     const grouped = settings.reduce((acc, setting) => {
@@ -117,6 +129,8 @@ router.put('/:key', async (req, res) => {
 
     if (updateError) throw updateError;
 
+    logAdminAction(req, { action: 'update_setting', category: 'settings', targetType: 'setting', targetId: key, details: { oldValue: currentSetting.setting_value, newValue: validatedValue.toString() } });
+
     res.json({
       message: 'Setting updated successfully',
       setting: {
@@ -180,6 +194,8 @@ router.put('/', async (req, res) => {
         errors.push({ key: setting.key, error: err.message });
       }
     }
+
+    logAdminAction(req, { action: 'bulk_update_settings', category: 'settings', details: { updated: results, failedCount: errors.length } });
 
     res.json({
       message: `Updated ${results.length} settings`,

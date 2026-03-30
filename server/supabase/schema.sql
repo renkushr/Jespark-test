@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 INSERT INTO system_settings (setting_key, setting_value, setting_type, category, description) VALUES
 -- Points Settings
 ('points_earn_rate', '10', 'number', 'points', 'Percentage of purchase amount given as points (e.g., 10 = 10%)'),
-('points_value', '1', 'number', 'points', 'Value of 1 point in currency (1 point = X baht)'),
+('points_value', '100', 'number', 'points', 'Points needed per 1 baht discount (100 points = 1 baht)'),
 ('points_expiry_days', '365', 'number', 'points', 'Number of days before points expire (0 = never expire)'),
 ('points_min_use', '10', 'number', 'points', 'Minimum points required to use for discount'),
 ('points_max_use_per_transaction', '5000', 'number', 'points', 'Maximum points that can be used per transaction'),
@@ -60,6 +60,7 @@ CREATE TABLE users (
   points INTEGER DEFAULT 0,
   wallet_balance DECIMAL(10, 2) DEFAULT 0.00,
   member_since VARCHAR(4) NOT NULL,
+  member_id VARCHAR(20) UNIQUE,
   phone VARCHAR(20),
   birth_date DATE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -259,6 +260,26 @@ INSERT INTO rewards (name, description, points_required, category, stock, is_act
   ('Discount Voucher 100฿', '100 Baht Discount', 300, 'Shopping', 200, true),
   ('Discount Voucher 500฿', '500 Baht Discount', 1500, 'Shopping', 100, true),
   ('Spa Treatment', '1 Hour Massage', 2000, 'Wellness', 30, true);
+
+-- Admin Audit Logs
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id BIGSERIAL PRIMARY KEY,
+  admin_id INTEGER REFERENCES users(id),
+  admin_email TEXT NOT NULL,
+  action TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'general',
+  target_type TEXT,
+  target_id TEXT,
+  details JSONB,
+  ip_address TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_logs_admin_id ON admin_logs(admin_id);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_action ON admin_logs(action);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_category ON admin_logs(category);
+CREATE INDEX IF NOT EXISTS idx_admin_logs_created_at ON admin_logs(created_at DESC);
 
 INSERT INTO stores (name, address, phone, latitude, longitude, is_active) VALUES
   ('Jespark Central World', '999/9 Rama I Rd, Pathum Wan, Bangkok', '02-123-4567', 13.7467, 100.5398, true),

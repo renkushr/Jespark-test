@@ -115,10 +115,11 @@ const AppRoutes: React.FC = () => {
         </div>
         {isLoggedIn && <Navbar />}
 
-        {/* Phone popup after login */}
+        {/* Phone/Name popup after login */}
         {showPhonePopup && user && (
           <PhonePopup
             userName={user.name}
+            userPhone={user.phone || ''}
             onComplete={async () => {
               setShowPhonePopup(false);
               await refreshUser();

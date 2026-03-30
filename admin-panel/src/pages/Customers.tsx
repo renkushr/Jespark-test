@@ -38,6 +38,9 @@ export default function Customers() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const showToast = (type: 'success' | 'error', message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000); };
 
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
   useEffect(() => { loadCustomers(); }, [searchTerm, tierFilter]);
 
   const loadCustomers = async () => {
@@ -47,7 +50,7 @@ export default function Customers() {
       if (searchTerm) params.append('search', searchTerm);
       if (tierFilter) params.append('tier', tierFilter);
       params.append('limit', '100');
-      const res = await fetch(`${API_BASE}/admin/customers?${params}`);
+      const res = await fetch(`${API_BASE}/admin/customers?${params}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { const data = await res.json(); setCustomers(data.customers || []); setError(''); }
       else throw new Error('Failed to load');
     } catch (err: any) {
@@ -74,7 +77,7 @@ export default function Customers() {
     try {
       setAddingPoints(true);
       const res = await fetch(`${API_BASE}/admin/points/add`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: authHeaders,
         body: JSON.stringify({ userId: selectedCustomer.id, points: parseInt(pointsAmount), title: pointsDescription || 'เพิ่มคะแนนจาก Admin' }),
       });
       if (res.ok) { showToast('success', 'เพิ่มคะแนนสำเร็จ!'); handleClosePointsModal(); loadCustomers(); }
@@ -87,10 +90,10 @@ export default function Customers() {
   const handleOpenEditModal = (customer: any) => {
     setEditCustomer(customer);
     setEditForm({
-      name: customer.display_name || customer.name || '',
+      name: customer.name || '',
       email: customer.email || '',
       phone: customer.phone || '',
-      tier: customer.tier || 'member',
+      tier: customer.tier || 'Member',
       points: customer.points || 0,
       wallet_balance: customer.wallet_balance || 0,
     });
@@ -102,7 +105,7 @@ export default function Customers() {
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/admin/users/${editCustomer.id}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: authHeaders,
         body: JSON.stringify(editForm),
       });
       if (res.ok) { showToast('success', 'บันทึกสำเร็จ'); setShowEditModal(false); loadCustomers(); }
@@ -118,14 +121,14 @@ export default function Customers() {
     setShowDeleteModal(true);
   };
 
-  const deleteTargetName = deleteTarget?.display_name || deleteTarget?.name || 'ลูกค้า';
+  const deleteTargetName = deleteTarget?.name || 'ลูกค้า';
   const isDeleteConfirmed = deleteConfirmText.trim() === deleteTargetName.trim();
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget || !isDeleteConfirmed) return;
     setDeleting(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/users/${deleteTarget.id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/admin/users/${deleteTarget.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { showToast('success', 'ลบลูกค้าสำเร็จ'); setShowDeleteModal(false); setDeleteTarget(null); loadCustomers(); }
       else { showToast('error', 'ไม่สามารถลบได้'); }
     } catch (err) { showToast('error', 'เกิดข้อผิดพลาด'); }
@@ -176,10 +179,10 @@ export default function Customers() {
             className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="">ทุก Tier</option>
-            <option value="member">Member</option>
-            <option value="silver">Silver</option>
-            <option value="gold">Gold</option>
-            <option value="platinum">Platinum</option>
+            <option value="Member">Member</option>
+            <option value="Silver">Silver</option>
+            <option value="Gold">Gold</option>
+            <option value="Platinum">Platinum</option>
           </select>
         </div>
       </Card>
@@ -214,7 +217,6 @@ export default function Customers() {
                     <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">อีเมล</th>
                     <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Tier</th>
                     <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">คะแนน</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">สถานะ</th>
                     <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                   </tr>
                 </thead>
@@ -223,16 +225,12 @@ export default function Customers() {
                     <tr key={customer.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
                       <td className="px-4 py-3 font-bold text-slate-500">{customer.member_id || '-'}</td>
                       <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{customer.display_name || customer.name || 'ไม่ระบุชื่อ'}</p>
+                        <p className="font-bold text-slate-800">{customer.name || 'ไม่ระบุชื่อ'}</p>
+                        {customer.phone && <p className="text-xs text-slate-400">{customer.phone}</p>}
                       </td>
                       <td className="px-4 py-3 text-slate-500">{customer.email || '-'}</td>
-                      <td className="px-4 py-3 text-center">{getTierBadge(customer.tier || 'member')}</td>
+                      <td className="px-4 py-3 text-center">{getTierBadge(customer.tier || 'Member')}</td>
                       <td className="px-4 py-3 text-right font-black text-slate-800">{(customer.points || 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant={customer.is_verified ? 'success' : 'warning'} hasDot>
-                          {customer.is_verified ? 'Active' : 'Pending'}
-                        </Badge>
-                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
                           <button onClick={() => handleOpenPointsModal(customer)} className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="ให้คะแนน">
@@ -272,7 +270,7 @@ export default function Customers() {
           <div className="space-y-4">
             <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">ลูกค้า</p>
-              <p className="font-bold text-slate-800">{selectedCustomer.display_name || selectedCustomer.name || 'ไม่ระบุชื่อ'}</p>
+              <p className="font-bold text-slate-800">{selectedCustomer.name || 'ไม่ระบุชื่อ'}</p>
               <p className="text-xs text-slate-500 mt-1">คะแนนปัจจุบัน: <span className="font-black text-primary">{(selectedCustomer.points || 0).toLocaleString()}</span></p>
             </div>
             <Input label="จำนวนคะแนน" type="number" value={pointsAmount} onChange={(e) => setPointsAmount(e.target.value)} placeholder="ใส่จำนวนคะแนน" icon="stars" min="1" required />
@@ -292,10 +290,10 @@ export default function Customers() {
             <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">ระดับสมาชิก</label>
             <select value={editForm.tier} onChange={(e) => setEditForm({ ...editForm, tier: e.target.value })}
               className="w-full px-4 py-2.5 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary">
-              <option value="member">Member</option>
-              <option value="silver">Silver</option>
-              <option value="gold">Gold</option>
-              <option value="platinum">Platinum</option>
+              <option value="Member">Member</option>
+              <option value="Silver">Silver</option>
+              <option value="Gold">Gold</option>
+              <option value="Platinum">Platinum</option>
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">

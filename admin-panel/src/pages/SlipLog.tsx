@@ -5,6 +5,7 @@ import Card from '../components/ui/Card';
 import Modal from '../components/ui/Modal';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+const getToken = () => localStorage.getItem('admin_token');
 
 interface SlipTransaction {
   id: number;
@@ -53,7 +54,7 @@ export default function SlipLog() {
       if (dateTo) params.append('dateTo', new Date(dateTo + 'T23:59:59').toISOString());
       params.append('limit', '100');
 
-      const res = await fetch(`${API_BASE}/slip-cashier/logs?${params}`);
+      const res = await fetch(`${API_BASE}/slip-cashier/logs?${params}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
       if (res.ok) {
         const data = await res.json();
         setLogs(data.logs || []);

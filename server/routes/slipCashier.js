@@ -1,8 +1,12 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
+import { authenticateAdmin } from '../middleware/auth.js';
+import { logAdminAction } from '../utils/adminLogger.js';
 import multer from 'multer';
 
 const router = express.Router();
+
+router.use(authenticateAdmin);
 
 // Multer config: store in memory for upload to Supabase Storage
 const upload = multer({
@@ -80,7 +84,7 @@ router.post('/upload', upload.single('slip'), async (req, res) => {
 // ============================================================
 router.post('/confirm', async (req, res) => {
   try {
-    const { slipImageUrl, ocrAmount, confirmedAmount, customerId, customerName, staffName, note } = req.body;
+    const { slipImageUrl, ocrAmount, confirmedAmount, customerId, customerName, staffName, note, receiptNo, hnNumber, receiptDate, flags } = req.body;
 
     if (!slipImageUrl || !confirmedAmount || !customerId || !staffName) {
       return res.status(400).json({ error: 'Missing required fields: slipImageUrl, confirmedAmount, customerId, staffName' });
@@ -91,24 +95,85 @@ router.post('/confirm', async (req, res) => {
       return res.status(400).json({ error: 'Invalid amount' });
     }
 
+    // --- Duplicate receipt check ---
+    if (receiptNo) {
+      const { data: existing } = await supabase
+        .from('slip_transactions')
+        .select('id, confirmed_at, customer_name')
+        .eq('receipt_no', receiptNo)
+        .limit(1);
+
+      if (existing && existing.length > 0) {
+        const prev = existing[0];
+        const prevDate = prev.confirmed_at ? new Date(prev.confirmed_at).toLocaleString('th-TH') : '';
+        return res.status(409).json({
+          error: `ใบเสร็จเลขที่ ${receiptNo} ถูกใช้ไปแล้ว${prevDate ? ' เมื่อ ' + prevDate : ''}${prev.customer_name ? ' (ลูกค้า: ' + prev.customer_name + ')' : ''}`
+        });
+      }
+    }
+
+    // --- Date validation ---
+    if (receiptDate) {
+      const thaiMonths = { 'มกราคม':0,'กุมภาพันธ์':1,'มีนาคม':2,'เมษายน':3,'พฤษภาคม':4,'มิถุนายน':5,'กรกฎาคม':6,'สิงหาคม':7,'กันยายน':8,'ตุลาคม':9,'พฤศจิกายน':10,'ธันวาคม':11 };
+      let parsedDate = null;
+
+      // Try Thai date: "30 มกราคม 2569 16:42:37 น."
+      const thaiMatch = receiptDate.match(/(\d{1,2})\s+(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+(\d{4})/);
+      if (thaiMatch) {
+        const day = parseInt(thaiMatch[1]);
+        const month = thaiMonths[thaiMatch[2]];
+        let year = parseInt(thaiMatch[3]);
+        if (year > 2500) year -= 543; // Convert Buddhist year
+        parsedDate = new Date(year, month, day);
+      }
+
+      // Try numeric date: "30/01/2569" or "30-01-69"
+      if (!parsedDate) {
+        const numMatch = receiptDate.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+        if (numMatch) {
+          const day = parseInt(numMatch[1]);
+          const month = parseInt(numMatch[2]) - 1;
+          let year = parseInt(numMatch[3]);
+          if (year > 2500) year -= 543;
+          if (year < 100) year += 2000;
+          parsedDate = new Date(year, month, day);
+        }
+      }
+
+      if (parsedDate && !isNaN(parsedDate.getTime())) {
+        const daysDiff = Math.floor((Date.now() - parsedDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff > 30) {
+          return res.status(400).json({ error: `ใบเสร็จหมดอายุ — วันที่ใบเสร็จเก่ากว่า 30 วัน (${receiptDate})` });
+        }
+      }
+    }
+
     // Calculate points: every 35 baht = 5 points
     const pointsEarned = Math.floor(amount / 35) * 5;
+
+    // Build insert data
+    const insertData = {
+      slip_image_url: slipImageUrl,
+      ocr_amount: ocrAmount ? parseFloat(ocrAmount) : null,
+      confirmed_amount: amount,
+      points_earned: pointsEarned,
+      customer_id: parseInt(customerId),
+      customer_name: customerName || null,
+      staff_name: staffName,
+      status: 'confirmed',
+      note: note || null,
+      confirmed_at: new Date().toISOString()
+    };
+
+    // Add new columns if they exist (graceful)
+    if (receiptNo) insertData.receipt_no = receiptNo;
+    if (hnNumber) insertData.hn_number = hnNumber;
+    if (flags && flags.length > 0) insertData.flags = flags;
 
     // Insert slip transaction
     const { data: slipTx, error: insertError } = await supabase
       .from('slip_transactions')
-      .insert({
-        slip_image_url: slipImageUrl,
-        ocr_amount: ocrAmount ? parseFloat(ocrAmount) : null,
-        confirmed_amount: amount,
-        points_earned: pointsEarned,
-        customer_id: parseInt(customerId),
-        customer_name: customerName || null,
-        staff_name: staffName,
-        status: 'confirmed',
-        note: note || null,
-        confirmed_at: new Date().toISOString()
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -140,6 +205,10 @@ router.post('/confirm', async (req, res) => {
             description: `สแกนสลิป ฿${amount.toFixed(2)} โดย ${staffName}`,
           });
       }
+    }
+
+    if (req.user?.role === 'admin') {
+      logAdminAction(req, { action: 'slip_confirm', category: 'cashier', targetType: 'user', targetId: customerId, details: { amount, pointsEarned, staffName, receiptNo: receiptNo || null, slipTxId: slipTx.id } });
     }
 
     res.json({
@@ -254,14 +323,15 @@ router.get('/logs/:id', async (req, res) => {
 router.get('/search-customer', async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q || q.length < 2) {
+    if (!q || q.length < 1) {
       return res.json({ customers: [] });
     }
 
+    const safeQ = q.replace(/[%,]/g, '');
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, display_name, email, phone, member_id, tier, points')
-      .or(`name.ilike.%${q}%,email.ilike.%${q}%,phone.ilike.%${q}%,member_id.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .select('id, name, email, phone, tier, points')
+      .or(`name.ilike.%${safeQ}%,email.ilike.%${safeQ}%,phone.ilike.%${safeQ}%`)
       .limit(10);
 
     if (error) throw error;
@@ -269,10 +339,10 @@ router.get('/search-customer', async (req, res) => {
     res.json({
       customers: (data || []).map(u => ({
         id: u.id,
-        name: u.display_name || u.name || 'ไม่ระบุชื่อ',
+        name: u.name || 'ไม่ระบุชื่อ',
         email: u.email,
         phone: u.phone,
-        memberId: u.member_id,
+        memberId: u.member_id || null,
         tier: u.tier,
         points: u.points
       }))

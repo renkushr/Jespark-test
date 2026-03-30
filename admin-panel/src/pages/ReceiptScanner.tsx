@@ -280,12 +280,13 @@ export default function ReceiptScanner() {
 
   // Customer search with debounce — uses /admin/customers endpoint
   const searchCustomer = useCallback(async (query: string) => {
-    if (query.length < 2) { setSearchResults([]); setSearchError(''); return; }
+    if (query.length < 1) { setSearchResults([]); setSearchError(''); return; }
     setSearching(true);
     setSearchError('');
     try {
       const params = new URLSearchParams({ search: query, limit: '10' });
-      const res = await fetch(`${API_BASE}/admin/customers?${params}`);
+      const tk = localStorage.getItem('admin_token');
+      const res = await fetch(`${API_BASE}/admin/customers?${params}`, { headers: { 'Authorization': `Bearer ${tk}` } });
       if (res.ok) {
         const data = await res.json();
         const mapped = (data.customers || []).map((c: any) => ({
@@ -310,11 +311,25 @@ export default function ReceiptScanner() {
 
   useEffect(() => {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
-    if (searchQuery.length >= 2) {
+    if (searchQuery.length >= 1) {
       searchTimeoutRef.current = setTimeout(() => searchCustomer(searchQuery), 300);
     } else { setSearchResults([]); }
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
   }, [searchQuery, searchCustomer]);
+
+  // Validation warnings
+  const hasHN = !!(receipt?.hn);
+  const hasReceiptNo = !!(receipt?.receiptNo);
+
+  // Amount mismatch warning
+  const ocrAmountNum = receipt?.total ? parseFloat(receipt.total.replace(/,/g, '')) : null;
+  const confirmedAmountNum = confirmedAmount ? parseFloat(confirmedAmount) : null;
+  const amountMismatch = ocrAmountNum !== null && confirmedAmountNum !== null && Math.abs(ocrAmountNum - confirmedAmountNum) > 0.01;
+
+  // Customer name cross-check
+  const ocrCustomerName = receipt?.customerName?.trim() || '';
+  const selectedName = selectedCustomer?.name?.trim() || '';
+  const nameMatchWarning = ocrCustomerName && selectedName && !selectedName.includes(ocrCustomerName) && !ocrCustomerName.includes(selectedName);
 
   // Points
   const pointsEarned = confirmedAmount ? Math.floor(parseFloat(confirmedAmount) / 35) * 5 : 0;
@@ -325,13 +340,15 @@ export default function ReceiptScanner() {
     if (!confirmedAmount || parseFloat(confirmedAmount) <= 0) { showToast('error', 'กรุณาใส่ยอดเงิน'); return; }
     if (!selectedCustomer) { showToast('error', 'กรุณาเลือกลูกค้า'); return; }
     if (!staffName.trim()) { showToast('error', 'กรุณาใส่ชื่อพนักงาน'); return; }
+    if (receipt && !hasHN) { showToast('error', 'ไม่พบเลข HN ในใบเสร็จ — ใบเสร็จอาจไม่ถูกต้อง'); return; }
 
     try {
       // Upload image
       setUploading(true);
       const formData = new FormData();
       formData.append('slip', imageFile);
-      const uploadRes = await fetch(`${API_BASE}/slip-cashier/upload`, { method: 'POST', body: formData });
+      const tk = localStorage.getItem('admin_token');
+      const uploadRes = await fetch(`${API_BASE}/slip-cashier/upload`, { method: 'POST', headers: { 'Authorization': `Bearer ${tk}` }, body: formData });
       if (!uploadRes.ok) { const err = await uploadRes.json(); throw new Error(err.error || 'Upload failed'); }
       const { imageUrl } = await uploadRes.json();
       setUploading(false);
@@ -340,7 +357,7 @@ export default function ReceiptScanner() {
       setConfirming(true);
       const confirmRes = await fetch(`${API_BASE}/slip-cashier/confirm`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tk}` },
         body: JSON.stringify({
           slipImageUrl: imageUrl,
           ocrAmount: receipt?.total ? parseFloat(receipt.total.replace(/,/g, '')) : null,
@@ -348,6 +365,13 @@ export default function ReceiptScanner() {
           customerId: selectedCustomer.id,
           customerName: selectedCustomer.name,
           staffName: staffName.trim(),
+          receiptNo: receipt?.receiptNo || null,
+          hnNumber: receipt?.hn || null,
+          receiptDate: receipt?.date || null,
+          flags: [
+            ...(amountMismatch ? ['amount_mismatch'] : []),
+            ...(nameMatchWarning ? ['name_mismatch'] : []),
+          ],
           note: note || (receipt ? `ใบเสร็จ: ${receipt.storeName || ''} ${receipt.receiptNo || ''} ${receipt.hn ? 'HN:' + receipt.hn : ''}`.trim() : null)
         })
       });
@@ -478,6 +502,25 @@ export default function ReceiptScanner() {
                   <InfoRow label="ชื่อ-นามสกุล" value={receipt.customerName} bold />
                   <InfoRow label="เลข HN" value={receipt.hn} bold />
                 </div>
+
+                {/* Validation Warnings */}
+                <div className="mt-3 space-y-2">
+                  {!hasHN && (
+                    <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                      <span className="material-symbols-outlined text-red-500 text-[18px]">error</span>
+                      <div>
+                        <p className="text-sm font-bold text-red-700">ไม่พบเลข HN</p>
+                        <p className="text-[10px] text-red-500">ใบเสร็จจากโรงพยาบาลจะมี HN เสมอ — ใบเสร็จนี้อาจไม่ถูกต้อง</p>
+                      </div>
+                    </div>
+                  )}
+                  {hasHN && hasReceiptNo && (
+                    <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-xl">
+                      <span className="material-symbols-outlined text-green-500 text-[16px]">verified</span>
+                      <p className="text-xs text-green-700 font-bold">พบ HN: {receipt.hn} · เลขที่: {receipt.receiptNo}</p>
+                    </div>
+                  )}
+                </div>
               </Card>
 
               {receipt.items.length > 0 && (
@@ -534,10 +577,13 @@ export default function ReceiptScanner() {
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-lg text-xl font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
                   />
                 </div>
-                {receipt?.total && confirmedAmount !== receipt.total.replace(/,/g, '') && (
-                  <p className="text-[10px] text-amber-600">
-                    <span className="material-symbols-outlined text-[12px] align-middle">info</span> OCR อ่านได้ ฿{receipt.total} — คุณแก้ไขเป็น ฿{confirmedAmount ? parseFloat(confirmedAmount).toLocaleString() : '0'}
-                  </p>
+                {amountMismatch && (
+                  <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl">
+                    <span className="material-symbols-outlined text-amber-500 text-[16px]">warning</span>
+                    <p className="text-xs text-amber-700">
+                      <span className="font-bold">ยอดไม่ตรง:</span> OCR อ่านได้ ฿{receipt?.total} แต่กรอก ฿{confirmedAmountNum?.toLocaleString()}
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -578,20 +624,31 @@ export default function ReceiptScanner() {
           {/* Customer Search */}
           <Card title="4. เลือกลูกค้า">
             {selectedCustomer ? (
-              <div className="flex items-center justify-between p-3 bg-primary-50 border border-primary-100 rounded-xl">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
-                    <span className="material-symbols-outlined text-primary text-[20px]">person</span>
+              <>
+                <div className="flex items-center justify-between p-3 bg-primary-50 border border-primary-100 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary-100 rounded-lg flex items-center justify-center">
+                      <span className="material-symbols-outlined text-primary text-[20px]">person</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">{selectedCustomer.name}</p>
+                      <p className="text-[10px] text-slate-500">{selectedCustomer.tier} · {selectedCustomer.points?.toLocaleString()} แต้ม</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">{selectedCustomer.name}</p>
-                    <p className="text-[10px] text-slate-500">{selectedCustomer.memberId} · {selectedCustomer.tier} · {selectedCustomer.points?.toLocaleString()} แต้ม</p>
-                  </div>
+                  <button onClick={() => { setSelectedCustomer(null); setSearchQuery(''); }} className="p-1.5 hover:bg-white rounded-lg transition-colors">
+                    <span className="material-symbols-outlined text-slate-400 text-[18px]">close</span>
+                  </button>
                 </div>
-                <button onClick={() => { setSelectedCustomer(null); setSearchQuery(''); }} className="p-1.5 hover:bg-white rounded-lg transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[18px]">close</span>
-                </button>
-              </div>
+                {nameMatchWarning && (
+                  <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl mt-2">
+                    <span className="material-symbols-outlined text-amber-500 text-[16px]">warning</span>
+                    <div>
+                      <p className="text-xs font-bold text-amber-700">ชื่อไม่ตรง</p>
+                      <p className="text-[10px] text-amber-600">ใบเสร็จ: &quot;{ocrCustomerName}&quot; · ลูกค้าที่เลือก: &quot;{selectedName}&quot;</p>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="space-y-3">
                 <div className="relative">
@@ -631,7 +688,7 @@ export default function ReceiptScanner() {
                     ))}
                   </div>
                 )}
-                {searchQuery.length >= 2 && !searching && searchResults.length === 0 && !searchError && (
+                {searchQuery.length >= 1 && !searching && searchResults.length === 0 && !searchError && (
                   <p className="text-sm text-slate-400 text-center py-3">ไม่พบลูกค้า</p>
                 )}
                 {searchError && (
@@ -663,7 +720,7 @@ export default function ReceiptScanner() {
               icon="check_circle"
               onClick={handleConfirm}
               isLoading={uploading || confirming}
-              disabled={!imageFile || !confirmedAmount || !selectedCustomer || !staffName.trim() || ocrProcessing}
+              disabled={!imageFile || !confirmedAmount || !selectedCustomer || !staffName.trim() || ocrProcessing || (!!receipt && !hasHN)}
               fullWidth
             >
               {uploading ? 'กำลังอัพโหลด...' : confirming ? 'กำลังยืนยัน...' : 'ยืนยันให้แต้ม'}

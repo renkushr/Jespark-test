@@ -30,13 +30,16 @@ export default function CustomerDetail() {
   const [pointsDesc, setPointsDesc] = useState('');
   const [addingPoints, setAddingPoints] = useState(false);
 
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
   useEffect(() => { if (id) loadCustomer(); }, [id]);
   useEffect(() => { if (customer) loadTabData(); }, [activeTab, customer]);
 
   const loadCustomer = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/customers/${id}`);
+      const res = await fetch(`${API_BASE}/admin/customers/${id}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         const found = data.customer;
@@ -60,13 +63,13 @@ export default function CustomerDetail() {
     setTabLoading(true);
     try {
       if (activeTab === 'purchases') {
-        const res = await fetch(`${API_BASE}/admin/customer/${id}/transactions`);
+        const res = await fetch(`${API_BASE}/admin/customer/${id}/transactions`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) { const data = await res.json(); setTransactions(data.transactions || []); }
       } else if (activeTab === 'points') {
-        const res = await fetch(`${API_BASE}/admin/points/history?userId=${id}&limit=50`);
+        const res = await fetch(`${API_BASE}/admin/points/history?userId=${id}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) { const data = await res.json(); setPointsHistory(data.history || []); }
       } else if (activeTab === 'redemptions') {
-        const res = await fetch(`${API_BASE}/admin/redemptions?userId=${id}&limit=50`);
+        const res = await fetch(`${API_BASE}/admin/redemptions?userId=${id}&limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (res.ok) { const data = await res.json(); setRedemptions(data.redemptions || []); }
         else setRedemptions([]);
       }
@@ -78,9 +81,7 @@ export default function CustomerDetail() {
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/admin/users/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+        method: 'PUT', headers: authHeaders, body: JSON.stringify(editForm),
       });
       if (res.ok) { setShowEditModal(false); loadCustomer(); }
       else { const d = await res.json(); alert(d.error || 'เกิดข้อผิดพลาด'); }
@@ -93,8 +94,7 @@ export default function CustomerDetail() {
     setAddingPoints(true);
     try {
       const res = await fetch(`${API_BASE}/admin/points/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: authHeaders,
         body: JSON.stringify({ userId: parseInt(id!), points: parseInt(pointsAmount), title: pointsDesc || 'เพิ่มคะแนนจาก Admin' }),
       });
       if (res.ok) { setShowPointsModal(false); setPointsAmount(''); setPointsDesc(''); loadCustomer(); loadTabData(); }
@@ -106,7 +106,7 @@ export default function CustomerDetail() {
   const handleDelete = async () => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบลูกค้านี้? ข้อมูลจะถูกลบถาวร')) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/users/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/admin/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { navigate('/customers'); }
       else { alert('ไม่สามารถลบได้'); }
     } catch (err) { alert('เกิดข้อผิดพลาด'); }

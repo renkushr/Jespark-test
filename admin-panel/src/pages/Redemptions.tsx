@@ -7,6 +7,8 @@ import Modal from '../components/ui/Modal';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
 
 export default function Redemptions() {
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
   const [redemptions, setRedemptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -24,7 +26,7 @@ export default function Redemptions() {
     try {
       let url = `${API_BASE}/admin/redemptions?limit=100`;
       if (statusFilter) url += `&status=${statusFilter}`;
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { const data = await res.json(); setRedemptions(data.redemptions || []); }
     } catch (err) { console.error(err); showError('ไม่สามารถโหลดข้อมูลได้'); }
     finally { setLoading(false); }
@@ -38,8 +40,7 @@ export default function Redemptions() {
     setProcessing(true);
     try {
       const res = await fetch(`${API_BASE}/admin/redemptions/${selectedRedemption.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'PUT', headers: authHeaders,
         body: JSON.stringify({ status, note: actionNote }),
       });
       if (res.ok) {

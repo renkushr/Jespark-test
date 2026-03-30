@@ -8,6 +8,9 @@ interface CompleteProfileProps {
   onComplete: () => void;
 }
 
+const THAI_NAME_REGEX = /^[ก-๏\s]+$/;
+const isThaiName = (v: string) => THAI_NAME_REGEX.test(v.trim()) && v.trim().includes(' ');
+
 const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { refreshUser } = useAuth();
@@ -19,6 +22,18 @@ const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [nameError, setNameError] = useState('');
+
+  const handleNameChange = (val: string) => {
+    setFormData({...formData, fullName: val});
+    if (val.trim().length > 0 && !THAI_NAME_REGEX.test(val.trim())) {
+      setNameError('กรุณากรอกเป็นภาษาไทยเท่านั้น');
+    } else if (val.trim().length > 0 && !val.trim().includes(' ')) {
+      setNameError('กรุณากรอกทั้งชื่อและนามสกุล');
+    } else {
+      setNameError('');
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +59,7 @@ const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
     return (filledFields / fields.length) * 100;
   }, [formData]);
 
-  const isFormValid = formData.fullName.length > 3 && formData.phone.length >= 10;
+  const isFormValid = isThaiName(formData.fullName) && formData.phone.length >= 10;
 
   return (
     <div className="flex flex-col min-h-screen bg-[#FDFDFD] animate-slide-up relative overflow-hidden">
@@ -92,17 +107,20 @@ const CompleteProfile: React.FC<CompleteProfileProps> = ({ onComplete }) => {
               </div>
               <input 
                 type="text" 
-                placeholder="กรอกชื่อจริงและนามสกุล"
+                placeholder="ชื่อจริง นามสกุล (ภาษาไทย)"
                 value={formData.fullName}
-                onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-                className="w-full h-14 bg-white border border-gray-200 rounded-xl pl-14 pr-5 text-sm font-bold text-dark-green focus:border-primary focus:ring-4 focus:ring-primary/10 outline-none transition-all placeholder:text-gray-300 placeholder:font-medium shadow-sm"
+                onChange={(e) => handleNameChange(e.target.value)}
+                className={`w-full h-14 bg-white border rounded-xl pl-14 pr-5 text-sm font-bold text-dark-green focus:ring-4 outline-none transition-all placeholder:text-gray-300 placeholder:font-medium shadow-sm ${nameError ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-primary focus:ring-primary/10'}`}
               />
-              {formData.fullName.length > 3 && (
+              {isThaiName(formData.fullName) && (
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 animate-fade-in">
                   <span className="material-symbols-outlined text-primary text-xl font-black">check_circle</span>
                 </div>
               )}
             </div>
+            {nameError && (
+              <p className="text-[10px] text-red-500 font-bold px-1 mt-1">{nameError}</p>
+            )}
           </div>
 
           {/* Phone Field */}

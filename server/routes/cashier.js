@@ -1,9 +1,12 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateAdmin } from '../middleware/auth.js';
 import { transactionLimiter } from '../middleware/rateLimiter.js';
+import { logAdminAction } from '../utils/adminLogger.js';
 
 const router = express.Router();
+
+router.use(authenticateAdmin);
 
 // Search customer by email or phone
 router.get('/search', async (req, res) => {
@@ -122,6 +125,8 @@ router.post('/checkout', transactionLimiter, async (req, res) => {
         type: 'success'
       });
 
+    logAdminAction(req, { action: 'cashier_checkout', category: 'cashier', targetType: 'user', targetId: customerId, details: { amount, earnedPoints, paymentMethod: 'cash' } });
+
     res.json({
       message: 'Checkout successful',
       earnedPoints: earnedPoints,
@@ -182,7 +187,7 @@ router.get('/stats', async (req, res) => {
   }
 });
 
-// Search customer by member_id (for QR code scan)
+// Search customer by member_id or user id (for QR code scan)
 router.get('/scan-lookup', async (req, res) => {
   try {
     const { memberId } = req.query;
@@ -191,13 +196,31 @@ router.get('/scan-lookup', async (req, res) => {
       return res.status(400).json({ error: 'Member ID required' });
     }
 
-    const { data: user, error } = await supabase
+    let user = null;
+
+    // Try member_id first (may not exist as a column)
+    const { data: byMemberId, error: memberIdErr } = await supabase
       .from('users')
       .select('*')
       .eq('member_id', memberId)
-      .single();
+      .maybeSingle();
 
-    if (error || !user) {
+    if (!memberIdErr && byMemberId) {
+      user = byMemberId;
+    } else {
+      // Fallback: try numeric id
+      const numId = parseInt(memberId);
+      if (!isNaN(numId)) {
+        const { data: byId } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', numId)
+          .maybeSingle();
+        if (byId) user = byId;
+      }
+    }
+
+    if (!user) {
       return res.status(404).json({ error: 'ไม่พบสมาชิกจากรหัสนี้' });
     }
 
@@ -208,7 +231,7 @@ router.get('/scan-lookup', async (req, res) => {
         email: user.email,
         phone: user.phone,
         tier: user.tier,
-        memberId: user.member_id,
+        memberId: user.member_id || null,
         memberSince: user.member_since,
         points: user.points,
         walletBalance: user.wallet_balance,
@@ -303,6 +326,8 @@ router.post('/wallet-pay', transactionLimiter, async (req, res) => {
         message: `ชำระ ฿${amount.toFixed(2)} จากวอลเล็ต ได้รับ ${earnedPoints} คะแนน`,
         type: 'success'
       });
+
+    logAdminAction(req, { action: 'cashier_wallet_pay', category: 'cashier', targetType: 'user', targetId: customerId, details: { amount, earnedPoints, paymentMethod: 'wallet' } });
 
     res.json({
       message: 'Wallet payment successful',
@@ -409,8 +434,9 @@ router.post('/checkout-with-points', transactionLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Insufficient points' });
     }
 
-    // Calculate discount (1 point = 1 baht)
-    const discount = pointsToUse;
+    // Calculate discount (100 points = 1 baht)
+    const POINTS_PER_BAHT = 100;
+    const discount = pointsToUse / POINTS_PER_BAHT;
     const finalAmount = Math.max(0, amount - discount);
 
     // Calculate earned points (every 35 baht = 1 point)
@@ -486,6 +512,8 @@ router.post('/checkout-with-points', transactionLimiter, async (req, res) => {
         type: 'success'
       });
 
+    logAdminAction(req, { action: 'cashier_checkout_with_points', category: 'cashier', targetType: 'user', targetId: customerId, details: { amount, discount, finalAmount, pointsUsed: pointsToUse, earnedPoints, paymentMethod } });
+
     res.json({
       message: 'Checkout successful',
       transaction: {
@@ -543,14 +571,19 @@ router.post('/refund/:transactionId', async (req, res) => {
     }
 
     // Calculate points adjustment
-    // Remove earned points, return used points
     const pointsAdjustment = transaction.points_used - transaction.points_earned;
     const newPoints = customer.points + pointsAdjustment;
 
-    // Update customer points
+    // Refund wallet if payment was via wallet
+    const walletRefund = (transaction.payment_method === 'wallet') ? transaction.final_amount : 0;
+    const newWallet = (customer.wallet_balance || 0) + walletRefund;
+
+    const updateData = { points: Math.max(0, newPoints) };
+    if (walletRefund > 0) updateData.wallet_balance = newWallet;
+
     await supabase
       .from('users')
-      .update({ points: Math.max(0, newPoints) })
+      .update(updateData)
       .eq('id', customer.id);
 
     // Update transaction status
@@ -601,6 +634,8 @@ router.post('/refund/:transactionId', async (req, res) => {
         type: 'info'
       });
 
+    logAdminAction(req, { action: 'cashier_refund', category: 'cashier', targetType: 'transaction', targetId: transactionId, details: { amount: transaction.final_amount, reason, customerId: transaction.customer_id, pointsReturned: transaction.points_used, pointsDeducted: transaction.points_earned, walletRefund } });
+
     res.json({
       message: 'Transaction refunded successfully',
       refund: {
@@ -608,6 +643,7 @@ router.post('/refund/:transactionId', async (req, res) => {
         amount: transaction.final_amount,
         pointsReturned: transaction.points_used,
         pointsDeducted: transaction.points_earned,
+        walletRefund,
         newBalance: Math.max(0, newPoints)
       }
     });

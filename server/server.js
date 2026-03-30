@@ -93,9 +93,8 @@ app.use(helmet({
     }
   }
 })); // Security headers with CSP
-app.use(morgan('combined')); // Request logging
-app.use(express.json({ limit: '1mb' })); // Limit body size
-app.use(morgan('dev'));
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.static('public'));
 app.use(checkBodySize);
 app.use(checkContentType);

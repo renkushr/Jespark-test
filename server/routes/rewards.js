@@ -1,6 +1,6 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateToken, authenticateAdmin } from '../middleware/auth.js';
 import { redemptionLimiter } from '../middleware/rateLimiter.js';
 import { redeemValidator, idParamValidator } from '../middleware/validator.js';
 
@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get all rewards (admin - raw fields)
-router.get('/admin/all', async (req, res) => {
+router.get('/admin/all', authenticateAdmin, async (req, res) => {
   try {
     const { data: rewards, error } = await supabase
       .from('rewards')

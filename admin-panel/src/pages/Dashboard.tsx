@@ -25,16 +25,19 @@ export default function Dashboard() {
     loadStats();
   }, []);
 
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Authorization': `Bearer ${token}` };
+
   const loadStats = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/cashier/stats`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/cashier/stats`, { headers: authHeaders });
       if (response.ok) {
         const data = await response.json();
         setStats([
-          { label: 'สมาชิกทั้งหมด', value: data.total.customers.toLocaleString(), change: '+12%', icon: 'people', accent: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
-          { label: 'ยอดขายวันนี้', value: `฿${data.today.revenue.toLocaleString()}`, change: '+8%', icon: 'payments', accent: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
-          { label: 'คะแนนที่แจก', value: data.today.pointsGiven.toLocaleString(), change: '+15%', icon: 'stars', accent: 'border-l-warning', iconBg: 'bg-amber-50 text-warning' },
-          { label: 'ธุรกรรมวันนี้', value: data.today.transactions.toLocaleString(), change: '+5%', icon: 'receipt_long', accent: 'border-l-violet-500', iconBg: 'bg-violet-50 text-violet-600' },
+          { label: 'สมาชิกทั้งหมด', value: data.total.customers.toLocaleString(), change: '', icon: 'people', accent: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
+          { label: 'ยอดขายวันนี้', value: `฿${data.today.revenue.toLocaleString()}`, change: '', icon: 'payments', accent: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
+          { label: 'คะแนนที่แจก', value: data.today.pointsGiven.toLocaleString(), change: '', icon: 'stars', accent: 'border-l-warning', iconBg: 'bg-amber-50 text-warning' },
+          { label: 'ธุรกรรมวันนี้', value: data.today.transactions.toLocaleString(), change: '', icon: 'receipt_long', accent: 'border-l-violet-500', iconBg: 'bg-violet-50 text-violet-600' },
         ]);
       }
     } catch (error) {
@@ -48,7 +51,7 @@ export default function Dashboard() {
 
   const loadRecentActivities = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/admin/transactions/recent?limit=10`);
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/admin/transactions/recent?limit=10`, { headers: authHeaders });
       if (response.ok) {
         const data = await response.json();
         setRecentActivities((data.transactions || []).map((t: any) => ({
@@ -93,7 +96,7 @@ export default function Dashboard() {
                 <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${stat.iconBg}`}>
                   <span className="material-symbols-outlined text-[20px]">{stat.icon}</span>
                 </div>
-                <Badge variant="success" hasDot>{stat.change}</Badge>
+                {stat.change && <Badge variant="success" hasDot>{stat.change}</Badge>}
               </div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{stat.label}</p>
               <p className="text-2xl font-black text-slate-900 mt-1">{stat.value}</p>

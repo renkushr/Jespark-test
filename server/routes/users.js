@@ -1,7 +1,7 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
 import { authenticateToken } from '../middleware/auth.js';
-import { updateProfileValidator, addPointsValidator } from '../middleware/validator.js';
+import { updateProfileValidator } from '../middleware/validator.js';
 
 const router = express.Router();
 
@@ -30,7 +30,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       points: user.points,
       walletBalance: user.wallet_balance,
       avatar: user.avatar,
-      needsProfile: !user.phone
+      needsProfile: !user.phone || !(user.name && /^[ก-๏\s]+$/.test(user.name.trim()) && user.name.trim().includes(' '))
     });
   } catch (error) {
     console.error('Get user error:', error);
@@ -43,8 +43,20 @@ router.put('/me', authenticateToken, updateProfileValidator, async (req, res) =>
   try {
     const { name, phone, birthDate } = req.body;
 
+    // Validate Thai name: must be Thai characters only + have space (first + last name)
+    const THAI_NAME_REGEX = /^[ก-๏\s]+$/;
+    if (name) {
+      const trimmed = name.trim();
+      if (!THAI_NAME_REGEX.test(trimmed)) {
+        return res.status(400).json({ error: 'ชื่อ-นามสกุลต้องเป็นภาษาไทยเท่านั้น' });
+      }
+      if (!trimmed.includes(' ')) {
+        return res.status(400).json({ error: 'กรุณากรอกทั้งชื่อและนามสกุล' });
+      }
+    }
+
     const updateData = {};
-    if (name) updateData.name = name;
+    if (name) updateData.name = name.trim();
     if (phone !== undefined) updateData.phone = phone;
     if (birthDate !== undefined) updateData.birth_date = birthDate;
 
@@ -84,54 +96,6 @@ router.put('/me', authenticateToken, updateProfileValidator, async (req, res) =>
   }
 });
 
-// Add points to user
-router.post('/points/add', authenticateToken, addPointsValidator, async (req, res) => {
-  try {
-    const { points, title, subtitle } = req.body;
-
-    if (!points || points <= 0) {
-      return res.status(400).json({ error: 'Valid points amount required' });
-    }
-
-    // Get current user
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('points')
-      .eq('id', req.user.userId)
-      .single();
-
-    if (userError || !user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    // Update user points
-    const { data: updatedUser, error: updateError } = await supabase
-      .from('users')
-      .update({ points: user.points + points })
-      .eq('id', req.user.userId)
-      .select('points')
-      .single();
-
-    if (updateError) throw updateError;
-
-    // Create points history
-    await supabase
-      .from('points_history')
-      .insert({
-        user_id: req.user.userId,
-        points: points,
-        type: 'earned',
-        description: title || 'คะแนนสะสม'
-      });
-
-    res.json({
-      message: 'Points added successfully',
-      points: updatedUser.points
-    });
-  } catch (error) {
-    console.error('Add points error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Points management is admin-only via /api/admin/points/add
 
 export default router;

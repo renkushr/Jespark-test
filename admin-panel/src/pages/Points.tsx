@@ -46,6 +46,8 @@ export default function Points() {
   const [errorMessage, setErrorMessage] = useState('');
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
   useEffect(() => {
     if (activeTab === 'history') loadHistory();
@@ -57,7 +59,7 @@ export default function Points() {
     try {
       let url = `${API_BASE}/admin/points/history?limit=100`;
       if (filterType) url += `&type=${filterType}`;
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         setHistory(data.history || []);
@@ -73,7 +75,7 @@ export default function Points() {
   const loadExpiringPoints = async () => {
     setExpiringLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/admin/points/expiring?days=${expiringDays}`);
+      const response = await fetch(`${API_BASE}/admin/points/expiring?days=${expiringDays}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         setExpiringPoints(data.expiringPoints || []);
@@ -100,8 +102,7 @@ export default function Points() {
     try {
       const endpoint = modalType === 'add' ? '/admin/points/add' : '/admin/points/deduct';
       const response = await fetch(`${API_BASE}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: authHeaders,
         body: JSON.stringify({ userId: parseInt(selectedUserId), points: parseInt(points), title: reason, reason }),
       });
       if (response.ok) { showSuccess(`${modalType === 'add' ? 'เพิ่ม' : 'หัก'}คะแนนสำเร็จ`); closeModal(); loadHistory(); }
@@ -116,8 +117,7 @@ export default function Points() {
       const userIds = bulkUserIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
       if (userIds.length === 0) { showError('กรุณาใส่ User IDs ที่ถูกต้อง'); setSubmitting(false); return; }
       const response = await fetch(`${API_BASE}/admin/points/bulk-add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: authHeaders,
         body: JSON.stringify({ userIds, points: parseInt(points), description: reason }),
       });
       if (response.ok) { const data = await response.json(); showSuccess(`เพิ่มคะแนนสำเร็จ ${data.summary.successful}/${data.summary.total} คน`); closeModal(); loadHistory(); }
@@ -128,7 +128,7 @@ export default function Points() {
 
   const handleExport = async (format: 'json' | 'csv') => {
     try {
-      const response = await fetch(`${API_BASE}/admin/points/export?format=${format}`);
+      const response = await fetch(`${API_BASE}/admin/points/export?format=${format}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         if (format === 'csv') {
           const blob = await response.blob();

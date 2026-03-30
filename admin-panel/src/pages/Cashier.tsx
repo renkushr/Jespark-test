@@ -45,6 +45,8 @@ export default function Cashier() {
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
   useEffect(() => {
     if (activeTab === 'history') loadTransactions();
@@ -54,7 +56,7 @@ export default function Cashier() {
   const loadTransactions = async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/cashier/transactions?limit=50`);
+      const response = await fetch(`${API_BASE}/cashier/transactions?limit=50`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         setTransactions(data.transactions || []);
@@ -69,7 +71,7 @@ export default function Cashier() {
   const loadSummary = async () => {
     setSummaryLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/cashier/my-summary`);
+      const response = await fetch(`${API_BASE}/cashier/my-summary`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
         setSummary(data);
@@ -88,7 +90,7 @@ export default function Cashier() {
     setError('');
     setCustomer(null);
     try {
-      const response = await fetch(`${API_BASE}/cashier/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`${API_BASE}/cashier/search?q=${encodeURIComponent(searchQuery)}`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (!response.ok) throw new Error('Customer not found');
       const data = await response.json();
       setCustomer(data.user);
@@ -114,7 +116,7 @@ export default function Cashier() {
 
       const response = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify(body),
       });
       if (!response.ok) {
@@ -149,7 +151,7 @@ export default function Cashier() {
       if (!reason) return;
       const response = await fetch(`${API_BASE}/cashier/refund/${transactionId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ reason }),
       });
       if (response.ok) { alert('คืนเงินสำเร็จ'); loadTransactions(); }
@@ -160,7 +162,8 @@ export default function Cashier() {
     }
   };
 
-  const calcDiscount = () => Math.min(usePoints, parseFloat(amount) || 0);
+  const POINTS_PER_BAHT = 100;
+  const calcDiscount = () => Math.min(usePoints / POINTS_PER_BAHT, parseFloat(amount) || 0);
   const calcFinal = () => Math.max(0, (parseFloat(amount) || 0) - calcDiscount());
   const calcPoints = () => Math.floor(calcFinal() / 35) * 5;
 
@@ -317,12 +320,13 @@ export default function Cashier() {
                   <div className="space-y-2 bg-slate-50 rounded-xl p-4 border border-slate-100">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">ใช้คะแนนแลกส่วนลด</label>
-                      <span className="text-[10px] font-medium text-slate-400">1 คะแนน = 1 บาท</span>
+                      <span className="text-[10px] font-medium text-slate-400">100 คะแนน = 1 บาท</span>
                     </div>
                     <input
                       type="range"
                       min="0"
-                      max={Math.min(customer.points, parseFloat(amount) || 0)}
+                      max={Math.min(customer.points, Math.ceil((parseFloat(amount) || 0) * POINTS_PER_BAHT))}
+                      step={POINTS_PER_BAHT}
                       value={usePoints}
                       onChange={(e) => setUsePoints(parseInt(e.target.value))}
                       className="w-full accent-primary"
@@ -330,8 +334,8 @@ export default function Cashier() {
                     />
                     <div className="flex justify-between text-xs text-slate-500">
                       <span>0</span>
-                      <span className="text-base font-black text-primary">{usePoints} คะแนน</span>
-                      <span>{Math.min(customer.points, parseFloat(amount) || 0)}</span>
+                      <span className="text-base font-black text-primary">{usePoints} คะแนน (= ฿{(usePoints / POINTS_PER_BAHT).toFixed(2)})</span>
+                      <span>{Math.min(customer.points, Math.ceil((parseFloat(amount) || 0) * POINTS_PER_BAHT)).toLocaleString()}</span>
                     </div>
                   </div>
                 )}

@@ -1,10 +1,13 @@
 import express from 'express';
 import supabase from '../config/supabase.js';
-import { authenticateToken } from '../middleware/auth.js';
+import { authenticateAdmin } from '../middleware/auth.js';
+import { logAdminAction } from '../utils/adminLogger.js';
 
 const router = express.Router();
 
-// Get dashboard stats (TODO: Add proper authentication in production)
+router.use(authenticateAdmin);
+
+// Get dashboard stats
 router.get('/stats', async (req, res) => {
   try {
     // Get total users
@@ -104,7 +107,7 @@ router.get('/rewards', async (req, res) => {
         description: reward.description,
         points: reward.points_required,
         category: reward.category,
-        image: reward.image,
+        image: reward.image_url,
         stock: reward.stock
       }))
     });
@@ -121,15 +124,18 @@ router.get('/customers', async (req, res) => {
 
     let query = supabase
       .from('users')
-      .select('id, name, email, phone, tier, points, wallet_balance, member_since, created_at', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`);
+      const safeSearch = search.replace(/[%,]/g, '');
+      if (safeSearch) {
+        query = query.or(`name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`);
+      }
     }
 
     if (tier) {
-      query = query.eq('tier', tier);
+      query = query.ilike('tier', tier);
     }
 
     const { data: users, error, count } = await query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
@@ -146,6 +152,7 @@ router.get('/customers', async (req, res) => {
         points: user.points,
         wallet_balance: user.wallet_balance,
         member_since: user.member_since,
+        member_id: user.member_id,
         created_at: user.created_at
       })),
       total: count
@@ -227,6 +234,8 @@ router.post('/points/add', async (req, res) => {
         type: 'earned',
         description: title || 'เพิ่มคะแนนจาก Admin'
       });
+
+    logAdminAction(req, { action: 'add_points', category: 'points', targetType: 'user', targetId: userId, details: { points, title, newTotal: updatedUser.points } });
 
     res.json({
       message: 'Points added successfully',
@@ -320,15 +329,19 @@ router.get('/analytics/revenue', async (req, res) => {
 
     if (error) throw error;
 
-    // Group by month
     const monthlyRevenue = {};
     transactions.forEach(t => {
-      const month = new Date(t.created_at).toLocaleDateString('en-US', { month: 'short' });
-      monthlyRevenue[month] = (monthlyRevenue[month] || 0) + parseFloat(t.amount);
+      const key = new Date(t.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+      monthlyRevenue[key] = (monthlyRevenue[key] || 0) + parseFloat(t.amount);
     });
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const data = months.map(month => monthlyRevenue[month] || 0);
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }));
+    }
+    const data = months.map(m => monthlyRevenue[m] || 0);
 
     res.json({ labels: months, data });
   } catch (error) {
@@ -348,15 +361,19 @@ router.get('/analytics/users', async (req, res) => {
 
     if (error) throw error;
 
-    // Group by month
     const monthlyUsers = {};
     users.forEach(u => {
-      const month = new Date(u.created_at).toLocaleDateString('en-US', { month: 'short' });
-      monthlyUsers[month] = (monthlyUsers[month] || 0) + 1;
+      const key = new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short' });
+      monthlyUsers[key] = (monthlyUsers[key] || 0) + 1;
     });
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    const data = months.map(month => monthlyUsers[month] || 0);
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      months.push(d.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }));
+    }
+    const data = months.map(m => monthlyUsers[m] || 0);
 
     res.json({ labels: months, data });
   } catch (error) {
@@ -371,21 +388,28 @@ router.put('/users/:id', async (req, res) => {
     const { id } = req.params;
     const { name, email, phone, tier, points, wallet_balance } = req.body;
 
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email;
+    if (phone !== undefined) updateData.phone = phone;
+    if (tier !== undefined) updateData.tier = tier;
+    if (points !== undefined) updateData.points = points;
+    if (wallet_balance !== undefined) updateData.wallet_balance = wallet_balance;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
     const { data, error } = await supabase
       .from('users')
-      .update({
-        name,
-        email,
-        phone,
-        tier,
-        points,
-        wallet_balance
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+
+    logAdminAction(req, { action: 'update_user', category: 'users', targetType: 'user', targetId: id, details: updateData });
 
     res.json({ message: 'User updated successfully', user: data });
   } catch (error) {
@@ -405,6 +429,8 @@ router.delete('/users/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    logAdminAction(req, { action: 'delete_user', category: 'users', targetType: 'user', targetId: id });
 
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
@@ -720,6 +746,8 @@ router.post('/points/deduct', async (req, res) => {
         description: reason || 'Points deducted by admin'
       });
 
+    logAdminAction(req, { action: 'deduct_points', category: 'points', targetType: 'user', targetId: userId, details: { points, reason, newTotal: updatedUser.points } });
+
     res.json({
       message: 'Points deducted successfully',
       user: {
@@ -780,7 +808,7 @@ router.post('/points/bulk-add', async (req, res) => {
           .insert({
             user_id: userId,
             points: points,
-            type: 'added',
+            type: 'earned',
             description: description || 'Bulk points addition by admin'
           });
 
@@ -793,6 +821,8 @@ router.post('/points/bulk-add', async (req, res) => {
         errors.push({ userId, error: 'Processing error' });
       }
     }
+
+    logAdminAction(req, { action: 'bulk_add_points', category: 'points', targetType: 'users', details: { points, description, totalUsers: userIds.length, successful: results.length, failed: errors.length } });
 
     res.json({
       message: `Points added to ${results.length} users`,
@@ -829,7 +859,12 @@ router.get('/points/expiring', async (req, res) => {
       .gte('expires_at', new Date().toISOString())
       .order('expires_at', { ascending: true });
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '42703' || error.message?.includes('does not exist') || error.message?.includes('expires_at')) {
+        return res.json({ summary: { totalUsers: 0, totalPoints: 0, expiringIn: parseInt(days) }, expiringPoints: [], message: 'expires_at column not available' });
+      }
+      throw error;
+    }
 
     const summary = {
       totalUsers: new Set(expiringPoints.map(p => p.user_id)).size,
@@ -874,6 +909,8 @@ router.put('/points/expiry/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    logAdminAction(req, { action: 'update_points_expiry', category: 'points', targetType: 'points_history', targetId: id, details: { expiresAt } });
 
     res.json({
       message: 'Points expiry updated successfully',
@@ -997,7 +1034,7 @@ router.get('/points/history', async (req, res) => {
 // Create reward
 router.post('/rewards', async (req, res) => {
   try {
-    const { name, description, points_required, category, image, stock } = req.body;
+    const { name, description, points_required, category, image, image_url, stock } = req.body;
 
     const { data, error } = await supabase
       .from('rewards')
@@ -1006,13 +1043,15 @@ router.post('/rewards', async (req, res) => {
         description,
         points_required,
         category,
-        image_url: image,
+        image_url: image_url || image || null,
         stock
       })
       .select()
       .single();
 
     if (error) throw error;
+
+    logAdminAction(req, { action: 'create_reward', category: 'rewards', targetType: 'reward', targetId: data.id, details: { name, points_required, category } });
 
     res.json({ message: 'Reward created successfully', reward: data });
   } catch (error) {
@@ -1025,7 +1064,7 @@ router.post('/rewards', async (req, res) => {
 router.put('/rewards/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, points_required, category, image, stock } = req.body;
+    const { name, description, points_required, category, image, image_url, stock } = req.body;
 
     const { data, error } = await supabase
       .from('rewards')
@@ -1034,7 +1073,7 @@ router.put('/rewards/:id', async (req, res) => {
         description,
         points_required,
         category,
-        image_url: image,
+        image_url: image_url || image || null,
         stock
       })
       .eq('id', id)
@@ -1042,6 +1081,8 @@ router.put('/rewards/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    logAdminAction(req, { action: 'update_reward', category: 'rewards', targetType: 'reward', targetId: id, details: { name, points_required, category } });
 
     res.json({ message: 'Reward updated successfully', reward: data });
   } catch (error) {
@@ -1062,6 +1103,8 @@ router.delete('/rewards/:id', async (req, res) => {
 
     if (error) throw error;
 
+    logAdminAction(req, { action: 'delete_reward', category: 'rewards', targetType: 'reward', targetId: id });
+
     res.json({ message: 'Reward deleted successfully' });
   } catch (error) {
     console.error('Delete reward error:', error);
@@ -1081,7 +1124,7 @@ router.get('/redemptions', async (req, res) => {
       .select(`
         *,
         rewards:reward_id (name, image_url, points_required, category),
-        users:user_id (id, name, email, phone, member_id)
+        users:user_id (id, name, email, phone)
       `, { count: 'exact' })
       .order('created_at', { ascending: false });
 
@@ -1102,7 +1145,7 @@ router.get('/redemptions', async (req, res) => {
         created_at: r.created_at,
         updated_at: r.updated_at,
         reward: r.rewards ? { name: r.rewards.name, image: r.rewards.image_url, points: r.rewards.points_required, category: r.rewards.category } : null,
-        user: r.users ? { id: r.users.id, name: r.users.name, email: r.users.email, phone: r.users.phone, member_id: r.users.member_id } : null
+        user: r.users ? { id: r.users.id, name: r.users.name, email: r.users.email, phone: r.users.phone } : null
       })),
       total: count
     });
@@ -1160,6 +1203,8 @@ router.put('/redemptions/:id', async (req, res) => {
       message: status === 'approved' ? `การแลกของรางวัล #${id} ได้รับการอนุมัติแล้ว` : `การแลกของรางวัล #${id} ถูกปฏิเสธ${note ? ': ' + note : ''}`,
       type: status === 'approved' ? 'success' : 'warning'
     });
+
+    logAdminAction(req, { action: `redemption_${status}`, category: 'redemptions', targetType: 'redemption', targetId: id, details: { status, note, userId: redemption.user_id, pointsUsed: redemption.points_used } });
 
     res.json({ message: `Redemption ${status}`, redemption: data });
   } catch (error) {
@@ -1230,6 +1275,8 @@ router.post('/notifications/send', async (req, res) => {
     const { data, error } = await supabase.from('notifications').insert(notifications).select();
     if (error) throw error;
 
+    logAdminAction(req, { action: 'send_notification', category: 'notifications', details: { title, type, recipientCount: data.length, broadcast: !userIds || userIds.length === 0 } });
+
     res.json({ message: `Sent ${data.length} notifications`, count: data.length });
   } catch (error) {
     console.error('Send notification error:', error);
@@ -1242,6 +1289,7 @@ router.delete('/notifications/:id', async (req, res) => {
   try {
     const { error } = await supabase.from('notifications').delete().eq('id', req.params.id);
     if (error) throw error;
+    logAdminAction(req, { action: 'delete_notification', category: 'notifications', targetType: 'notification', targetId: req.params.id });
     res.json({ message: 'Notification deleted' });
   } catch (error) {
     console.error('Delete notification error:', error);
@@ -1304,6 +1352,7 @@ router.post('/coupons', async (req, res) => {
       .single();
 
     if (error) throw error;
+    logAdminAction(req, { action: 'create_coupon', category: 'coupons', targetType: 'coupon', targetId: data.id, details: { code, title, discount_type, discount_value } });
     res.json({ message: 'Coupon created', coupon: data });
   } catch (error) {
     console.error('Create coupon error:', error);
@@ -1316,6 +1365,7 @@ router.delete('/coupons/:id', async (req, res) => {
   try {
     const { error } = await supabase.from('coupons').delete().eq('id', req.params.id);
     if (error) throw error;
+    logAdminAction(req, { action: 'delete_coupon', category: 'coupons', targetType: 'coupon', targetId: req.params.id });
     res.json({ message: 'Coupon deleted' });
   } catch (error) {
     console.error('Delete coupon error:', error);
@@ -1355,24 +1405,76 @@ router.get('/customer/:id/transactions', async (req, res) => {
   }
 });
 
-// ==================== END MANAGEMENT ENDPOINTS ====================
+// ==================== ADMIN AUDIT LOGS ====================
 
-// TEMPORARY: Reset all data (remove this in production!)
-router.delete('/reset-all-data', async (req, res) => {
+router.get('/logs', async (req, res) => {
   try {
-    // Delete in order to avoid foreign key issues
-    await supabase.from('notifications').delete().neq('id', 0);
-    await supabase.from('points_history').delete().neq('id', 0);
-    await supabase.from('cashier_transactions').delete().neq('id', 0);
-    await supabase.from('wallet_transactions').delete().neq('id', 0);
-    await supabase.from('redemptions').delete().neq('id', 0);
-    await supabase.from('users').delete().neq('id', 0);
+    const { limit = 50, offset = 0, category, action, adminEmail, startDate, endDate } = req.query;
 
-    res.json({ message: 'All data has been reset successfully' });
+    let query = supabase
+      .from('admin_logs')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false });
+
+    if (category) query = query.eq('category', category);
+    if (action) query = query.ilike('action', `%${action}%`);
+    if (adminEmail) query = query.ilike('admin_email', `%${adminEmail}%`);
+    if (startDate) query = query.gte('created_at', startDate);
+    if (endDate) query = query.lte('created_at', endDate);
+
+    query = query.range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+    const { data: logs, error, count } = await query;
+
+    if (error) {
+      if (error.message?.includes('does not exist') || error.message?.includes('not find') || error.code === 'PGRST204' || error.code === '42P01') {
+        return res.json({ logs: [], total: 0, message: 'admin_logs table not created yet' });
+      }
+      throw error;
+    }
+
+    res.json({ logs, total: count });
   } catch (error) {
-    console.error('Reset data error:', error);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    console.error('Get admin logs error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+router.get('/logs/summary', async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data: todayLogs, error: todayError } = await supabase
+      .from('admin_logs')
+      .select('action, category')
+      .gte('created_at', today.toISOString());
+
+    if (todayError) {
+      if (todayError.message?.includes('does not exist') || todayError.message?.includes('not find') || todayError.code === 'PGRST204' || todayError.code === '42P01') {
+        return res.json({ todayActions: 0, loginAttempts: 0, categories: {} });
+      }
+      throw todayError;
+    }
+
+    const categories = {};
+    let loginAttempts = 0;
+    todayLogs.forEach(log => {
+      categories[log.category] = (categories[log.category] || 0) + 1;
+      if (log.category === 'auth') loginAttempts++;
+    });
+
+    res.json({
+      todayActions: todayLogs.length,
+      loginAttempts,
+      categories
+    });
+  } catch (error) {
+    console.error('Get logs summary error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ==================== END MANAGEMENT ENDPOINTS ====================
 
 export default router;

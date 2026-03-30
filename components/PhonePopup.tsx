@@ -3,16 +3,32 @@ import apiClient from '../src/api/client';
 
 interface PhonePopupProps {
   userName: string;
+  userPhone?: string;
   onComplete: () => void;
 }
 
-const PhonePopup: React.FC<PhonePopupProps> = ({ userName, onComplete }) => {
-  const [name, setName] = useState(userName || '');
-  const [phone, setPhone] = useState('');
+const THAI_NAME_REGEX = /^[ก-๏\s]+$/;
+const isThaiName = (v: string) => THAI_NAME_REGEX.test(v.trim()) && v.trim().includes(' ');
+
+const PhonePopup: React.FC<PhonePopupProps> = ({ userName, userPhone, onComplete }) => {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState(userPhone || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [nameError, setNameError] = useState('');
 
-  const isValid = name.trim().length >= 2 && phone.trim().length >= 10;
+  const handleNameChange = (val: string) => {
+    setName(val);
+    if (val.trim().length > 0 && !THAI_NAME_REGEX.test(val.trim())) {
+      setNameError('กรุณากรอกเป็นภาษาไทยเท่านั้น');
+    } else if (val.trim().length > 0 && !val.trim().includes(' ')) {
+      setNameError('กรุณากรอกทั้งชื่อและนามสกุล');
+    } else {
+      setNameError('');
+    }
+  };
+
+  const isValid = isThaiName(name) && phone.trim().length >= 10;
 
   const handleSave = async () => {
     if (!isValid) return;
@@ -58,16 +74,19 @@ const PhonePopup: React.FC<PhonePopupProps> = ({ userName, onComplete }) => {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="กรอกชื่อจริงและนามสกุล"
-                className="w-full h-12 bg-gray-50 border border-gray-200 rounded-xl pl-12 pr-4 text-sm font-bold text-dark-green focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                onChange={(e) => handleNameChange(e.target.value)}
+                placeholder="ชื่อจริง นามสกุล (ภาษาไทย)"
+                className={`w-full h-12 bg-gray-50 border rounded-xl pl-12 pr-4 text-sm font-bold text-dark-green focus:ring-2 outline-none transition-all ${nameError ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-primary focus:ring-primary/20'}`}
               />
-              {name.trim().length >= 2 && (
+              {isThaiName(name) && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   <span className="material-symbols-outlined text-primary text-lg">check_circle</span>
                 </div>
               )}
             </div>
+            {nameError && (
+              <p className="text-[10px] text-red-500 font-bold px-1">{nameError}</p>
+            )}
           </div>
 
           {/* Phone */}

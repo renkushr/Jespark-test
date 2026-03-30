@@ -40,6 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         points: userData.points,
         walletBalance: userData.walletBalance,
         avatar: userData.avatar,
+        phone: userData.phone,
         needsProfile: userData.needsProfile,
       });
       setIsLoggedIn(true);
@@ -84,6 +85,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       points: response.user.points,
       walletBalance: response.user.walletBalance,
       avatar: response.user.avatar,
+      phone: response.user.phone,
       needsProfile: (response as any).needsProfile,
     });
     setIsLoggedIn(true);

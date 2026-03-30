@@ -18,6 +18,7 @@ const menuItems = [
   { path: '/coupons', icon: 'confirmation_number', label: 'คูปอง' },
   { path: '/notifications', icon: 'notifications', label: 'แจ้งเตือน' },
   { path: '/reports', icon: 'bar_chart', label: 'รายงาน' },
+  { path: '/audit-logs', icon: 'shield_person', label: 'Audit Logs' },
   { path: '/settings', icon: 'settings', label: 'ตั้งค่า' },
 ];
 

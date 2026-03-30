@@ -24,12 +24,14 @@ export default function Rewards() {
   });
 
   const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
   useEffect(() => { loadRewards(); }, []);
 
   const loadRewards = async () => {
     try {
-      const response = await fetch(`${API_BASE}/rewards/admin/all`);
+      const response = await fetch(`${API_BASE}/rewards/admin/all`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) { const data = await response.json(); setRewards(data.rewards || []); }
     } catch (error) { console.error('Error loading rewards:', error); }
     finally { setLoading(false); }
@@ -41,8 +43,8 @@ export default function Rewards() {
       const url = editingReward ? `${API_BASE}/admin/rewards/${editingReward.id}` : `${API_BASE}/admin/rewards`;
       const response = await fetch(url, {
         method: editingReward ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: formData.name, description: formData.description, points_required: parseInt(formData.points_required), category: formData.category, image: formData.image_url, stock: parseInt(formData.stock) }),
+        headers: authHeaders,
+        body: JSON.stringify({ name: formData.name, description: formData.description, points_required: parseInt(formData.points_required), category: formData.category, image_url: formData.image_url, stock: parseInt(formData.stock) }),
       });
       if (response.ok) {
         setShowModal(false); setEditingReward(null);
@@ -64,7 +66,7 @@ export default function Rewards() {
   const handleDelete = async (id: number) => {
     if (!confirm('ต้องการลบของรางวัลนี้?')) return;
     try {
-      const response = await fetch(`${API_BASE}/admin/rewards/${id}`, { method: 'DELETE' });
+      const response = await fetch(`${API_BASE}/admin/rewards/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) loadRewards();
     } catch (error) { console.error('Error:', error); }
   };

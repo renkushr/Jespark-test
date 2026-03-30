@@ -15,12 +15,15 @@ export default function Notifications() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
   useEffect(() => { loadNotifications(); }, []);
 
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/notifications?limit=100`);
+      const res = await fetch(`${API_BASE}/admin/notifications?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { const data = await res.json(); setNotifications(data.notifications || []); }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -36,7 +39,7 @@ export default function Notifications() {
       const userIds = sendForm.userIds ? sendForm.userIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id)) : [];
       const res = await fetch(`${API_BASE}/admin/notifications/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({ title: sendForm.title, message: sendForm.message, type: sendForm.type, userIds }),
       });
       if (res.ok) {
@@ -52,7 +55,7 @@ export default function Notifications() {
   const handleDelete = async (id: number) => {
     if (!confirm('ลบการแจ้งเตือนนี้?')) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/notifications/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/admin/notifications/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { showSuccess('ลบสำเร็จ'); loadNotifications(); }
     } catch (err) { showError('เกิดข้อผิดพลาด'); }
   };

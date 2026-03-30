@@ -15,12 +15,15 @@ export default function Coupons() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
+  const token = localStorage.getItem('admin_token');
+  const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+
   useEffect(() => { loadCoupons(); }, []);
 
   const loadCoupons = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/coupons?limit=100`);
+      const res = await fetch(`${API_BASE}/admin/coupons?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { const data = await res.json(); setCoupons(data.coupons || []); }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -42,7 +45,7 @@ export default function Coupons() {
     try {
       const res = await fetch(`${API_BASE}/admin/coupons`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders,
         body: JSON.stringify({
           ...form,
           discount_value: parseFloat(form.discount_value),
@@ -64,7 +67,7 @@ export default function Coupons() {
   const handleDelete = async (id: number) => {
     if (!confirm('ลบคูปองนี้?')) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/coupons/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_BASE}/admin/coupons/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) { showSuccess('ลบสำเร็จ'); loadCoupons(); }
     } catch (err) { showError('เกิดข้อผิดพลาด'); }
   };

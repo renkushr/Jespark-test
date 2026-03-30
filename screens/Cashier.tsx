@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Html5Qrcode } from 'html5-qrcode';
 import apiClient from '../src/api/client';
@@ -18,9 +18,12 @@ interface Customer {
 
 type PaymentMode = 'cash' | 'wallet';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api';
+
 const Cashier: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Customer[]>([]);
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,6 +33,7 @@ const Cashier: React.FC = () => {
   const [scanning, setScanning] = useState(false);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Cleanup scanner on unmount
   useEffect(() => {
@@ -40,40 +44,55 @@ const Cashier: React.FC = () => {
     };
   }, []);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setError('กรุณาใส่อีเมล, เบอร์โทร หรือรหัสสมาชิก');
-      return;
-    }
-
+  // Autocomplete customer search with debounce
+  const searchCustomers = useCallback(async (query: string) => {
+    if (query.length < 1) { setSearchResults([]); return; }
+    setSearching(true);
     try {
-      setSearching(true);
-      setError('');
-      setCustomer(null);
-
-      // Try member_id lookup first if it looks like a member ID
-      if (searchQuery.startsWith('JSP-')) {
+      // Try member_id lookup first
+      if (query.startsWith('JSP-')) {
         try {
-          const response = await apiClient.scanLookup(searchQuery);
-          setCustomer(response.user);
-          setSuccess('พบข้อมูลลูกค้า');
-          setTimeout(() => setSuccess(''), 2000);
+          const response = await apiClient.scanLookup(query);
+          setSearchResults([response.user]);
+          setSearching(false);
           return;
-        } catch {
-          // fallback to normal search
-        }
+        } catch { /* fallback */ }
       }
-      
-      const response = await apiClient.searchCustomer(searchQuery);
-      setCustomer(response.user);
-      setSuccess('พบข้อมูลลูกค้า');
-      setTimeout(() => setSuccess(''), 2000);
-    } catch (err: any) {
-      setError(err.message || 'ไม่พบข้อมูลลูกค้า');
-      setCustomer(null);
-    } finally {
-      setSearching(false);
-    }
+      const params = new URLSearchParams({ search: query, limit: '10' });
+      const res = await fetch(`${API_BASE}/admin/customers?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults((data.customers || []).map((c: any) => ({
+          id: c.id,
+          name: c.name || 'ไม่ระบุชื่อ',
+          email: c.email,
+          phone: c.phone,
+          tier: c.tier,
+          points: c.points,
+          walletBalance: c.wallet_balance || 0,
+          avatar: '',
+          memberId: c.member_id || '',
+        })));
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+    } finally { setSearching(false); }
+  }, []);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!customer && searchQuery.length >= 1) {
+      searchTimeoutRef.current = setTimeout(() => searchCustomers(searchQuery), 300);
+    } else { setSearchResults([]); }
+    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current); };
+  }, [searchQuery, searchCustomers, customer]);
+
+  const selectCustomer = (c: Customer) => {
+    setCustomer(c);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSuccess('พบข้อมูลลูกค้า');
+    setTimeout(() => setSuccess(''), 2000);
   };
 
   const startScanner = async () => {
@@ -240,27 +259,64 @@ const Cashier: React.FC = () => {
               ค้นหาลูกค้า
             </h2>
             
-            <div className="flex gap-3 mb-3">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="อีเมล, เบอร์โทร หรือรหัสสมาชิก (JSP-...)"
-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none font-medium text-sm"
-              />
-              <button
-                onClick={handleSearch}
-                disabled={searching}
-                className="px-5 py-3 bg-primary text-white rounded-xl font-black hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-2"
-              >
-                {searching ? (
-                  <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                ) : (
-                  <span className="material-symbols-outlined text-lg">search</span>
+            {customer ? (
+              <div className="flex items-center justify-between p-3 bg-primary/5 border border-primary/20 rounded-xl mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <span className="material-symbols-outlined text-primary text-xl">person</span>
+                  </div>
+                  <div>
+                    <p className="font-bold text-dark-green text-sm">{customer.name}</p>
+                    <p className="text-[10px] text-gray-500">{customer.tier} · {customer.points?.toLocaleString()} แต้ม{customer.phone ? ` · ${customer.phone}` : ''}</p>
+                  </div>
+                </div>
+                <button onClick={() => { setCustomer(null); setSearchQuery(''); }} className="p-1.5 hover:bg-white rounded-lg transition-colors">
+                  <span className="material-symbols-outlined text-gray-400 text-lg">close</span>
+                </button>
+              </div>
+            ) : (
+              <div className="relative mb-3">
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xl">search</span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="พิมพ์ชื่อ, เบอร์โทร หรือรหัสสมาชิก..."
+                    className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-primary focus:outline-none font-medium text-sm"
+                  />
+                  {searching && (
+                    <span className="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-primary text-lg animate-spin">progress_activity</span>
+                  )}
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto">
+                    {searchResults.map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => selectCustomer(c)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-b-0 text-left"
+                      >
+                        <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-gray-400 text-base">person</span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-dark-green text-sm truncate">{c.name}</p>
+                          <p className="text-[10px] text-gray-400 truncate">{c.phone || ''}{c.phone && c.email ? ' · ' : ''}{c.email || ''}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[10px] font-bold text-primary">{c.points?.toLocaleString()} แต้ม</p>
+                          <p className="text-[10px] text-gray-400">{c.tier}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </button>
-            </div>
+                {searchQuery.length >= 1 && !searching && searchResults.length === 0 && (
+                  <p className="text-sm text-gray-400 text-center py-3">ไม่พบลูกค้า</p>
+                )}
+              </div>
+            )}
 
             {/* Scan QR Button */}
             <button
