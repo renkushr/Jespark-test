@@ -153,8 +153,9 @@ CREATE TABLE points_history (
   points INTEGER NOT NULL,
   type VARCHAR(50) NOT NULL, -- 'earned', 'spent', 'expired', 'adjusted'
   description TEXT,
-  reference_id BIGINT, -- ID of related transaction/redemption
-  reference_type VARCHAR(50), -- 'transaction', 'redemption', 'cashier'
+  reference_id BIGINT,
+  reference_type VARCHAR(50),
+  expires_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -164,8 +165,46 @@ CREATE TABLE cashier_transactions (
   customer_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
   cashier_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
   amount DECIMAL(10, 2) NOT NULL,
-  points_earned INTEGER NOT NULL,
+  final_amount DECIMAL(10, 2),
+  points_earned INTEGER NOT NULL DEFAULT 0,
+  points_used INTEGER DEFAULT 0,
+  discount DECIMAL(10, 2) DEFAULT 0,
   payment_method VARCHAR(50),
+  status VARCHAR(50) DEFAULT 'completed',
+  notes TEXT,
+  refund_reason TEXT,
+  refunded_at TIMESTAMP WITH TIME ZONE,
+  refunded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Slip Transactions Table (OCR Cashier)
+CREATE TABLE slip_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  slip_image_url TEXT NOT NULL,
+  ocr_amount DECIMAL(10, 2),
+  confirmed_amount DECIMAL(10, 2),
+  points_earned INTEGER DEFAULT 0,
+  customer_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  customer_name TEXT,
+  staff_name TEXT NOT NULL,
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'rejected')),
+  note TEXT,
+  receipt_no TEXT,
+  hn_number TEXT,
+  flags JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  confirmed_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Wallet Transactions Table
+CREATE TABLE wallet_transactions (
+  id BIGSERIAL PRIMARY KEY,
+  customer_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+  cashier_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  amount DECIMAL(10, 2) NOT NULL,
+  points_earned INTEGER DEFAULT 0,
+  status VARCHAR(50) DEFAULT 'completed',
   notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -182,7 +221,15 @@ CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 CREATE INDEX idx_coupons_user_id ON coupons(user_id);
 CREATE INDEX idx_coupons_code ON coupons(code);
 CREATE INDEX idx_points_history_user_id ON points_history(user_id);
+CREATE INDEX idx_points_history_expires_at ON points_history(expires_at);
 CREATE INDEX idx_cashier_transactions_customer_id ON cashier_transactions(customer_id);
+CREATE INDEX idx_cashier_transactions_status ON cashier_transactions(status);
+CREATE INDEX idx_slip_transactions_customer_id ON slip_transactions(customer_id);
+CREATE INDEX idx_slip_transactions_status ON slip_transactions(status);
+CREATE INDEX idx_slip_transactions_created_at ON slip_transactions(created_at DESC);
+CREATE INDEX idx_slip_transactions_staff_name ON slip_transactions(staff_name);
+CREATE INDEX idx_wallet_transactions_customer_id ON wallet_transactions(customer_id);
+CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_at DESC);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()

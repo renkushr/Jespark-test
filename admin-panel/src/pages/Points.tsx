@@ -41,6 +41,9 @@ export default function Points() {
   const [expiringDays, setExpiringDays] = useState(30);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
   const [expiringLoading, setExpiringLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,18 +54,24 @@ export default function Points() {
 
   useEffect(() => {
     if (activeTab === 'history') loadHistory();
-    else loadExpiringPoints();
-  }, [activeTab, filterType]);
+  }, [activeTab, filterType, page]);
+
+  useEffect(() => {
+    if (activeTab === 'expiring') loadExpiringPoints();
+  }, [activeTab]);
 
   const loadHistory = async () => {
     setLoading(true);
     try {
-      let url = `${API_BASE}/admin/points/history?limit=100`;
-      if (filterType) url += `&type=${filterType}`;
+      const offset = (page - 1) * PAGE_SIZE;
+      let url = `${API_BASE}/admin/points/history?limit=${PAGE_SIZE}&offset=${offset}`;
+      if (filterType) url += `&type=${encodeURIComponent(filterType)}`;
       const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
       if (response.ok) {
         const data = await response.json();
-        setHistory(data.history || []);
+        const list = data.history || [];
+        setHistory(list);
+        setTotalCount(data.total ?? data.pagination?.total ?? list.length);
       }
     } catch (error) {
       console.error('Error loading history:', error);
@@ -235,7 +244,7 @@ export default function Points() {
               </div>
               <select
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => { setPage(1); setFilterType(e.target.value); }}
                 className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20"
               >
                 <option value="">ทุกประเภท</option>
@@ -254,6 +263,7 @@ export default function Points() {
                 <p className="text-sm text-slate-400 mt-3">ไม่พบประวัติ</p>
               </div>
             ) : (
+              <>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[600px]">
                   <thead>
@@ -293,6 +303,35 @@ export default function Points() {
                   </tbody>
                 </table>
               </div>
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    แสดง {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}-{Math.min(page * PAGE_SIZE, totalCount)} จาก {totalCount} รายการ
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-bold text-slate-600">
+                      หน้า {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * PAGE_SIZE >= totalCount}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ถัดไป
+                    </button>
+                  </div>
+                </div>
+              )}
+              </>
             )}
           </Card>
         </div>

@@ -42,6 +42,13 @@ const Notifications: React.FC = () => {
     } catch (_) {}
   };
 
+  const handleMarkRead = async (id: number) => {
+    try {
+      await apiClient.markNotificationRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (_) {}
+  };
+
   const styleFor = (type: string) => typeStyle[type?.toLowerCase()] || typeStyle.info;
 
   return (
@@ -78,7 +85,8 @@ const Notifications: React.FC = () => {
             return (
               <div
                 key={n.id}
-                className={`p-5 flex gap-4 border-b border-gray-100 transition-colors active:bg-gray-50 relative ${!n.isRead ? 'bg-white' : 'bg-transparent opacity-80'}`}
+                onClick={() => !n.isRead && handleMarkRead(n.id)}
+                className={`p-5 flex gap-4 border-b border-gray-100 transition-colors active:bg-gray-50 relative cursor-pointer ${!n.isRead ? 'bg-white' : 'bg-transparent opacity-80'}`}
               >
                 {!n.isRead && (
                   <div className="absolute right-5 top-6 size-2.5 bg-primary rounded-full shadow-[0_0_8px_rgba(19,236,19,0.4)]" />

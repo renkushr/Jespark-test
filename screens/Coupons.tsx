@@ -9,6 +9,7 @@ const Coupons: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [useLoading, setUseLoading] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'available' | 'used'>('available');
 
   useEffect(() => {
     const load = async () => {
@@ -31,7 +32,7 @@ const Coupons: React.FC = () => {
     try {
       setUseLoading(id);
       await apiClient.useCoupon(id);
-      setCoupons(prev => prev.filter(c => c.id !== id));
+      setCoupons(prev => prev.map(c => c.id === id ? { ...c, isUsed: true } : c));
     } catch (err: any) {
       setError(err.message || 'ใช้คูปองไม่สำเร็จ');
     } finally {
@@ -55,6 +56,10 @@ const Coupons: React.FC = () => {
     return c.title || 'ส่วนลดพิเศษ';
   };
 
+  const availableCoupons = coupons.filter(c => !c.isUsed);
+  const usedCoupons = coupons.filter(c => c.isUsed);
+  const displayCoupons = activeTab === 'available' ? availableCoupons : usedCoupons;
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 animate-fade-in pb-32">
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100">
@@ -68,8 +73,8 @@ const Coupons: React.FC = () => {
           <div className="size-10" />
         </div>
         <div className="flex border-b border-gray-50 px-4">
-          <button className="flex-1 py-4 text-sm font-black text-primary border-b-[3px] border-primary">ใช้ได้</button>
-          <button className="flex-1 py-4 text-sm font-bold text-gray-400">ใช้แล้ว/หมดอายุ</button>
+          <button onClick={() => setActiveTab('available')} className={`flex-1 py-4 text-sm font-black transition-all ${activeTab === 'available' ? 'text-primary border-b-[3px] border-primary' : 'text-gray-400'}`}>ใช้ได้ ({availableCoupons.length})</button>
+          <button onClick={() => setActiveTab('used')} className={`flex-1 py-4 text-sm font-black transition-all ${activeTab === 'used' ? 'text-primary border-b-[3px] border-primary' : 'text-gray-400'}`}>ใช้แล้ว/หมดอายุ ({usedCoupons.length})</button>
         </div>
       </header>
 
@@ -81,7 +86,7 @@ const Coupons: React.FC = () => {
         <div className="p-6 mx-4 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm text-center">
           {error}
         </div>
-      ) : coupons.length === 0 ? (
+      ) : displayCoupons.length === 0 ? (
         <div className="p-12 text-center text-gray-500">
           <span className="material-symbols-outlined text-4xl mb-2">confirmation_number</span>
           <p className="text-sm font-bold">ยังไม่มีคูปอง</p>
@@ -89,7 +94,7 @@ const Coupons: React.FC = () => {
         </div>
       ) : (
         <main className="p-4 space-y-5">
-          {coupons.map((coupon) => {
+          {displayCoupons.map((coupon) => {
             const urgent = coupon.expiryDate && (new Date(coupon.expiryDate).getTime() - Date.now()) < 2 * 24 * 60 * 60 * 1000;
             return (
               <div
@@ -114,13 +119,17 @@ const Coupons: React.FC = () => {
                       {formatExpiry(coupon.expiryDate)}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleUse(coupon.id)}
-                    disabled={useLoading === coupon.id}
-                    className="w-full bg-primary text-dark-green py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-transform disabled:opacity-50"
-                  >
-                    {useLoading === coupon.id ? 'กำลังใช้...' : 'ใช้เลย'}
-                  </button>
+                  {!coupon.isUsed ? (
+                    <button
+                      onClick={() => handleUse(coupon.id)}
+                      disabled={useLoading === coupon.id}
+                      className="w-full bg-primary text-dark-green py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 active:scale-95 transition-transform disabled:opacity-50"
+                    >
+                      {useLoading === coupon.id ? 'กำลังใช้...' : 'ใช้เลย'}
+                    </button>
+                  ) : (
+                    <div className="w-full bg-gray-100 text-gray-400 py-3 rounded-xl font-black text-xs uppercase tracking-widest text-center">ใช้แล้ว</div>
+                  )}
                 </div>
                 <div className="coupon-tear-off my-6" />
                 <div className="flex-1 min-w-[120px] bg-gray-100 m-3 rounded-xl" />

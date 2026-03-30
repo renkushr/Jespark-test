@@ -12,6 +12,9 @@ export default function Redemptions() {
   const [redemptions, setRedemptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
   const [showModal, setShowModal] = useState(false);
   const [selectedRedemption, setSelectedRedemption] = useState<any>(null);
   const [actionNote, setActionNote] = useState('');
@@ -19,15 +22,21 @@ export default function Redemptions() {
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  useEffect(() => { loadRedemptions(); }, [statusFilter]);
+  useEffect(() => { loadRedemptions(); }, [statusFilter, page]);
 
   const loadRedemptions = async () => {
     setLoading(true);
     try {
-      let url = `${API_BASE}/admin/redemptions?limit=100`;
-      if (statusFilter) url += `&status=${statusFilter}`;
+      const offset = (page - 1) * PAGE_SIZE;
+      let url = `${API_BASE}/admin/redemptions?limit=${PAGE_SIZE}&offset=${offset}`;
+      if (statusFilter) url += `&status=${encodeURIComponent(statusFilter)}`;
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) { const data = await res.json(); setRedemptions(data.redemptions || []); }
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.redemptions || [];
+        setRedemptions(list);
+        setTotalCount(data.total ?? data.pagination?.total ?? list.length);
+      }
     } catch (err) { console.error(err); showError('ไม่สามารถโหลดข้อมูลได้'); }
     finally { setLoading(false); }
   };
@@ -99,7 +108,7 @@ export default function Redemptions() {
           { key: 'approved', label: 'อนุมัติแล้ว' },
           { key: 'rejected', label: 'ปฏิเสธแล้ว' },
         ].map((f) => (
-          <button key={f.key} onClick={() => setStatusFilter(f.key)}
+          <button key={f.key} onClick={() => { setPage(1); setStatusFilter(f.key); }}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
               statusFilter === f.key ? 'bg-primary text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200 hover:border-slate-300'
             }`}>
@@ -122,51 +131,81 @@ export default function Redemptions() {
               <p className="text-sm text-slate-400 mt-3">ไม่มีรายการ</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ID</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ลูกค้า</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ของรางวัล</th>
-                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">คะแนน</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">สถานะ</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">วันที่</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {redemptions.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-500">#{r.id}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{r.user?.name || '-'}</p>
-                        <p className="text-[10px] text-slate-400">{r.user?.email}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{r.reward?.name || '-'}</p>
-                        <p className="text-[10px] text-slate-400">{r.reward?.category}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right font-black text-violet-600">{(r.points_used || 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center">{getStatusBadge(r.status)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{r.created_at ? new Date(r.created_at).toLocaleDateString('th-TH') : '-'}</td>
-                      <td className="px-4 py-3 text-center">
-                        {r.status === 'pending' ? (
-                          <div className="flex items-center justify-center gap-1">
-                            <button onClick={() => { setSelectedRedemption(r); setShowModal(true); }}
-                              className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="อนุมัติ/ปฏิเสธ">
-                              <span className="material-symbols-outlined text-primary text-[18px]">rule</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-400">-</span>
-                        )}
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ID</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ลูกค้า</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ของรางวัล</th>
+                      <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">คะแนน</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">สถานะ</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">วันที่</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {redemptions.map((r) => (
+                      <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-500">#{r.id}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{r.user?.name || '-'}</p>
+                          <p className="text-[10px] text-slate-400">{r.user?.email}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{r.reward?.name || '-'}</p>
+                          <p className="text-[10px] text-slate-400">{r.reward?.category}</p>
+                        </td>
+                        <td className="px-4 py-3 text-right font-black text-violet-600">{(r.points_used || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-center">{getStatusBadge(r.status)}</td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{r.created_at ? new Date(r.created_at).toLocaleDateString('th-TH') : '-'}</td>
+                        <td className="px-4 py-3 text-center">
+                          {r.status === 'pending' ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => { setSelectedRedemption(r); setShowModal(true); }}
+                                className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="อนุมัติ/ปฏิเสธ">
+                                <span className="material-symbols-outlined text-primary text-[18px]">rule</span>
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    แสดง {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}-{Math.min(page * PAGE_SIZE, totalCount)} จาก {totalCount} รายการ
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-bold text-slate-600">
+                      หน้า {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * PAGE_SIZE >= totalCount}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ถัดไป
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </Card>
       )}

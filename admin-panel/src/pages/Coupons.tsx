@@ -14,17 +14,26 @@ export default function Coupons() {
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   const token = localStorage.getItem('admin_token');
   const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
-  useEffect(() => { loadCoupons(); }, []);
+  useEffect(() => { loadCoupons(); }, [page]);
 
   const loadCoupons = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/coupons?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) { const data = await res.json(); setCoupons(data.coupons || []); }
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await fetch(`${API_BASE}/admin/coupons?limit=${PAGE_SIZE}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.coupons || [];
+        setCoupons(list);
+        setTotalCount(data.total ?? data.pagination?.total ?? list.length);
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -98,7 +107,7 @@ export default function Coupons() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 sm:gap-4">
         {[
-          { label: 'ทั้งหมด', value: coupons.length, icon: 'confirmation_number', color: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
+          { label: 'ทั้งหมด', value: totalCount, icon: 'confirmation_number', color: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
           { label: 'ยังไม่ใช้', value: coupons.filter(c => !c.is_used).length, icon: 'new_releases', color: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
           { label: 'ใช้แล้ว', value: coupons.filter(c => c.is_used).length, icon: 'check_circle', color: 'border-l-slate-400', iconBg: 'bg-slate-100 text-slate-500' },
         ].map((s, i) => (
@@ -126,50 +135,80 @@ export default function Coupons() {
               <p className="text-sm text-slate-400 mt-3">ยังไม่มีคูปอง</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[600px]">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">รหัส</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ชื่อ</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">ส่วนลด</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ลูกค้า</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">สถานะ</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">หมดอายุ</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {coupons.map((c) => (
-                    <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <span className="font-mono font-black text-primary bg-primary-50 px-2 py-1 rounded-md text-xs">{c.code}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{c.title}</p>
-                        <p className="text-[10px] text-slate-400">{c.description}</p>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-black text-success">
-                          {c.discount_type === 'percent' ? `${c.discount_value}%` : `฿${c.discount_value}`}
-                        </span>
-                        {c.min_purchase > 0 && <p className="text-[10px] text-slate-400">ขั้นต่ำ ฿{c.min_purchase}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{c.user?.name || 'ทุกคน'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge variant={c.is_used ? 'neutral' : 'success'} hasDot>{c.is_used ? 'ใช้แล้ว' : 'พร้อมใช้'}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{c.expires_at ? new Date(c.expires_at).toLocaleDateString('th-TH') : 'ไม่หมดอายุ'}</td>
-                      <td className="px-4 py-3 text-center">
-                        <button onClick={() => handleDelete(c.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
-                          <span className="material-symbols-outlined text-slate-400 hover:text-danger text-[18px]">delete</span>
-                        </button>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">รหัส</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ชื่อ</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">ส่วนลด</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ลูกค้า</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">สถานะ</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">หมดอายุ</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {coupons.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <span className="font-mono font-black text-primary bg-primary-50 px-2 py-1 rounded-md text-xs">{c.code}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{c.title}</p>
+                          <p className="text-[10px] text-slate-400">{c.description}</p>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className="font-black text-success">
+                            {c.discount_type === 'percent' ? `${c.discount_value}%` : `฿${c.discount_value}`}
+                          </span>
+                          {c.min_purchase > 0 && <p className="text-[10px] text-slate-400">ขั้นต่ำ ฿{c.min_purchase}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{c.user?.name || 'ทุกคน'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge variant={c.is_used ? 'neutral' : 'success'} hasDot>{c.is_used ? 'ใช้แล้ว' : 'พร้อมใช้'}</Badge>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-slate-500">{c.expires_at ? new Date(c.expires_at).toLocaleDateString('th-TH') : 'ไม่หมดอายุ'}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button onClick={() => handleDelete(c.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
+                            <span className="material-symbols-outlined text-slate-400 hover:text-danger text-[18px]">delete</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    แสดง {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}-{Math.min(page * PAGE_SIZE, totalCount)} จาก {totalCount} รายการ
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-bold text-slate-600">
+                      หน้า {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * PAGE_SIZE >= totalCount}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ถัดไป
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </Card>
       )}

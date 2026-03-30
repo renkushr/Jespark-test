@@ -14,6 +14,9 @@ export default function Customers() {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [tierFilter, setTierFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   // Points modal
   const [showPointsModal, setShowPointsModal] = useState(false);
@@ -41,7 +44,7 @@ export default function Customers() {
   const token = localStorage.getItem('admin_token');
   const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
-  useEffect(() => { loadCustomers(); }, [searchTerm, tierFilter]);
+  useEffect(() => { loadCustomers(); }, [searchTerm, tierFilter, page]);
 
   const loadCustomers = async () => {
     try {
@@ -49,9 +52,16 @@ export default function Customers() {
       const params = new URLSearchParams();
       if (searchTerm) params.append('search', searchTerm);
       if (tierFilter) params.append('tier', tierFilter);
-      params.append('limit', '100');
+      params.append('limit', String(PAGE_SIZE));
+      params.append('offset', String((page - 1) * PAGE_SIZE));
       const res = await fetch(`${API_BASE}/admin/customers?${params}`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) { const data = await res.json(); setCustomers(data.customers || []); setError(''); }
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.customers || [];
+        setCustomers(list);
+        setTotalCount(data.total ?? data.pagination?.total ?? list.length);
+        setError('');
+      }
       else throw new Error('Failed to load');
     } catch (err: any) {
       console.error('Error loading customers:', err);
@@ -169,13 +179,13 @@ export default function Customers() {
               type="text"
               placeholder="ค้นหาด้วยชื่อ, อีเมล, หรือเบอร์โทร..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setPage(1); setSearchTerm(e.target.value); }}
               className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:bg-white transition-all"
             />
           </div>
           <select
             value={tierFilter}
-            onChange={(e) => setTierFilter(e.target.value)}
+            onChange={(e) => { setPage(1); setTierFilter(e.target.value); }}
             className="px-4 py-2.5 border border-slate-200 rounded-lg text-sm text-slate-600 bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           >
             <option value="">ทุก Tier</option>
@@ -208,59 +218,82 @@ export default function Customers() {
               <p className="text-sm text-slate-400 mt-3">ไม่พบข้อมูลลูกค้า</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm min-w-[650px]">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">รหัส</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ชื่อ</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">อีเมล</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Tier</th>
-                    <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">คะแนน</th>
-                    <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.map((customer) => (
-                    <tr key={customer.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-slate-500">{customer.member_id || '-'}</td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold text-slate-800">{customer.name || 'ไม่ระบุชื่อ'}</p>
-                        {customer.phone && <p className="text-xs text-slate-400">{customer.phone}</p>}
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">{customer.email || '-'}</td>
-                      <td className="px-4 py-3 text-center">{getTierBadge(customer.tier || 'Member')}</td>
-                      <td className="px-4 py-3 text-right font-black text-slate-800">{(customer.points || 0).toLocaleString()}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-1">
-                          <button onClick={() => handleOpenPointsModal(customer)} className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="ให้คะแนน">
-                            <span className="material-symbols-outlined text-success text-[18px]">add_circle</span>
-                          </button>
-                          <Link to={`/customers/${customer.id}`} className="p-1.5 hover:bg-primary-50 rounded-lg transition-colors" title="ดูรายละเอียด">
-                            <span className="material-symbols-outlined text-primary text-[18px]">visibility</span>
-                          </Link>
-                          <button onClick={() => handleOpenEditModal(customer)} className="p-1.5 hover:bg-sky-50 rounded-lg transition-colors" title="แก้ไข">
-                            <span className="material-symbols-outlined text-sky-500 text-[18px]">edit</span>
-                          </button>
-                          <button onClick={() => handleDelete(customer)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
-                            <span className="material-symbols-outlined text-danger text-[18px]">delete</span>
-                          </button>
-                        </div>
-                      </td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[650px]">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">รหัส</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">ชื่อ</th>
+                      <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-widest text-slate-400">อีเมล</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Tier</th>
+                      <th className="px-3 py-3 text-right text-[10px] font-bold uppercase tracking-widest text-slate-400">คะแนน</th>
+                      <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {customers.map((customer) => (
+                      <tr key={customer.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="px-4 py-3 font-bold text-slate-500">{customer.member_id || '-'}</td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold text-slate-800">{customer.name || 'ไม่ระบุชื่อ'}</p>
+                          {customer.phone && <p className="text-xs text-slate-400">{customer.phone}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{customer.email || '-'}</td>
+                        <td className="px-4 py-3 text-center">{getTierBadge(customer.tier || 'Member')}</td>
+                        <td className="px-4 py-3 text-right font-black text-slate-800">{(customer.points || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => handleOpenPointsModal(customer)} className="p-1.5 hover:bg-emerald-50 rounded-lg transition-colors" title="ให้คะแนน">
+                              <span className="material-symbols-outlined text-success text-[18px]">add_circle</span>
+                            </button>
+                            <Link to={`/customers/${customer.id}`} className="p-1.5 hover:bg-primary-50 rounded-lg transition-colors" title="ดูรายละเอียด">
+                              <span className="material-symbols-outlined text-primary text-[18px]">visibility</span>
+                            </Link>
+                            <button onClick={() => handleOpenEditModal(customer)} className="p-1.5 hover:bg-sky-50 rounded-lg transition-colors" title="แก้ไข">
+                              <span className="material-symbols-outlined text-sky-500 text-[18px]">edit</span>
+                            </button>
+                            <button onClick={() => handleDelete(customer)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors" title="ลบ">
+                              <span className="material-symbols-outlined text-danger text-[18px]">delete</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    แสดง {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}-{Math.min(page * PAGE_SIZE, totalCount)} จาก {totalCount} รายการ
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-bold text-slate-600">
+                      หน้า {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * PAGE_SIZE >= totalCount}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ถัดไป
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </Card>
-      )}
-
-      {/* Pagination */}
-      {!loading && !error && customers.length > 0 && (
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-slate-400">แสดง <span className="font-bold text-slate-600">{customers.length}</span> รายการ</p>
-        </div>
       )}
 
       {/* Add Points Modal */}

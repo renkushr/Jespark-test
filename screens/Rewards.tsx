@@ -17,6 +17,7 @@ const Rewards: React.FC<RewardsProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState('ทั้งหมด');
   const [sortOrder, setSortOrder] = useState<'none' | 'asc' | 'desc'>('none');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [redeemLoading, setRedeemLoading] = useState(false);
@@ -72,6 +73,11 @@ const Rewards: React.FC<RewardsProps> = ({ user }) => {
       ? [...rewards]
       : rewards.filter(r => r.category === activeCategory);
 
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(r => r.title.toLowerCase().includes(q) || r.description.toLowerCase().includes(q));
+    }
+
     if (sortOrder === 'asc') {
       result.sort((a, b) => a.points - b.points);
     } else if (sortOrder === 'desc') {
@@ -79,7 +85,7 @@ const Rewards: React.FC<RewardsProps> = ({ user }) => {
     }
 
     return result;
-  }, [rewards, activeCategory, sortOrder]);
+  }, [rewards, activeCategory, sortOrder, searchQuery]);
 
   const toggleSort = () => {
     if (sortOrder === 'none') setSortOrder('asc');
@@ -113,7 +119,7 @@ const Rewards: React.FC<RewardsProps> = ({ user }) => {
         <div className="px-4 py-4 flex gap-2">
            <div className="flex-1 flex items-center rounded-xl bg-gray-100 px-4 h-12 shadow-inner">
              <span className="material-symbols-outlined text-gray-400">search</span>
-             <input className="bg-transparent border-none focus:ring-0 text-sm flex-1 ml-2 placeholder-gray-400" placeholder="ค้นหาของรางวัล..." />
+             <input className="bg-transparent border-none focus:ring-0 text-sm flex-1 ml-2 placeholder-gray-400" placeholder="ค้นหาของรางวัล..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
            </div>
            <button 
              onClick={toggleSort}
@@ -239,7 +245,7 @@ const Rewards: React.FC<RewardsProps> = ({ user }) => {
                  <div className="size-16 rounded-xl bg-cover bg-center" style={{ backgroundImage: `url(${selectedReward.image})` }} />
                  <div className="text-left">
                    <p className="font-bold text-lg leading-tight">{selectedReward.title}</p>
-                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">รายการเลขที่ #8823910</p>
+                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-1">แลกสำเร็จ</p>
                  </div>
                </div>
                

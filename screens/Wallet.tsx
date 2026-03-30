@@ -19,6 +19,11 @@ const Wallet: React.FC<WalletProps> = ({ user }) => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showTopup, setShowTopup] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('');
+  const [topupLoading, setTopupLoading] = useState(false);
+  const [topupSuccess, setTopupSuccess] = useState(false);
+  const [topupError, setTopupError] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -79,12 +84,8 @@ const Wallet: React.FC<WalletProps> = ({ user }) => {
 
       <div className="px-4 -mt-8 mb-6 relative z-30">
         <div className="bg-white rounded-2xl shadow-xl p-5 flex justify-between items-center gap-4 border border-gray-100">
-          {[
-            { label: 'เติมเงิน', icon: 'add_circle', color: 'bg-primary/10 text-primary' },
-            { label: 'โอนเงิน', icon: 'send', color: 'bg-primary text-dark-green shadow-lg shadow-primary/20' },
-            { label: 'ถอนเงิน', icon: 'account_balance_wallet', color: 'bg-primary/10 text-primary' },
-          ].map((action) => (
-            <div key={action.label} className="flex flex-col items-center flex-1 gap-2 cursor-pointer">
+          {walletActions.map((action) => (
+            <div key={action.label} className="flex flex-col items-center flex-1 gap-2 cursor-pointer" onClick={action.onClick}>
               <div className={`size-12 rounded-2xl flex items-center justify-center ${action.color}`}>
                 <span className="material-symbols-outlined">{action.icon}</span>
               </div>
@@ -145,6 +146,95 @@ const Wallet: React.FC<WalletProps> = ({ user }) => {
           </div>
         )}
       </div>
+
+      {showTopup && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => !topupLoading && setShowTopup(false)} />
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl p-6 pb-8 animate-slide-up">
+            <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6" />
+
+            {topupSuccess ? (
+              <div className="text-center py-8">
+                <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="material-symbols-outlined text-green-600 text-4xl">check_circle</span>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">เติมเงินสำเร็จ!</h3>
+                <p className="text-gray-500 text-sm mb-6">ยอดเงินของคุณได้รับการอัพเดทแล้ว</p>
+                <button
+                  type="button"
+                  onClick={() => { setShowTopup(false); setTopupSuccess(false); window.location.reload(); }}
+                  className="w-full py-3 bg-primary text-dark-green font-bold rounded-xl"
+                >
+                  ตกลง
+                </button>
+              </div>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold text-gray-900 mb-1">เติมเงิน</h3>
+                <p className="text-gray-500 text-sm mb-6">เลือกจำนวนเงินที่ต้องการเติม</p>
+
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {[100, 200, 500, 1000, 2000, 5000].map((amt) => (
+                    <button
+                      type="button"
+                      key={amt}
+                      onClick={() => { setTopupAmount(amt.toString()); setTopupError(''); }}
+                      className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                        topupAmount === amt.toString()
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      ฿{amt.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mb-4">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">หรือใส่จำนวนเอง</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">฿</span>
+                    <input
+                      type="number"
+                      value={topupAmount}
+                      onChange={(e) => { setTopupAmount(e.target.value); setTopupError(''); }}
+                      placeholder="0.00"
+                      className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl text-lg font-bold focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {topupError && (
+                  <p className="text-red-500 text-sm mb-4 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">error</span>
+                    {topupError}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleTopup}
+                  disabled={topupLoading || !topupAmount}
+                  className={`w-full py-4 rounded-xl font-bold text-lg transition-all ${
+                    topupLoading || !topupAmount
+                      ? 'bg-gray-200 text-gray-400'
+                      : 'bg-dark-green text-primary shadow-lg'
+                  }`}
+                >
+                  {topupLoading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="animate-spin material-symbols-outlined text-xl">progress_activity</span>
+                      กำลังดำเนินการ...
+                    </span>
+                  ) : (
+                    `เติมเงิน ฿${topupAmount ? parseFloat(topupAmount).toLocaleString() : '0'}`
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

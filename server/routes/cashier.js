@@ -311,10 +311,12 @@ router.post('/wallet-pay', transactionLimiter, async (req, res) => {
     await supabase
       .from('wallet_transactions')
       .insert({
-        user_id: customer.id,
+        customer_id: customer.id,
+        cashier_id: req.user?.userId || null,
         amount: -amount,
-        type: 'payment',
-        description: `ชำระเงินที่ร้าน - ฿${amount.toFixed(2)}`
+        points_earned: earnedPoints,
+        status: 'completed',
+        notes: `ชำระเงินที่ร้าน - ฿${amount.toFixed(2)}`
       });
 
     // Create notification

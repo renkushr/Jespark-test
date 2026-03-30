@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -13,6 +15,7 @@ interface StatItem {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<StatItem[]>([
     { label: 'สมาชิกทั้งหมด', value: '0', change: '+0%', icon: 'people', accent: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
     { label: 'ยอดขายวันนี้', value: '฿0', change: '+0%', icon: 'payments', accent: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
@@ -20,6 +23,10 @@ export default function Dashboard() {
     { label: 'ธุรกรรมวันนี้', value: '0', change: '+0%', icon: 'receipt_long', accent: 'border-l-violet-500', iconBg: 'bg-violet-50 text-violet-600' },
   ]);
   const [loading, setLoading] = useState(true);
+  const [chartData, setChartData] = useState<any[]>([]);
+  const [chartPeriod, setChartPeriod] = useState('7');
+  const [chartLoading, setChartLoading] = useState(true);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
 
   useEffect(() => {
     loadStats();
@@ -47,7 +54,40 @@ export default function Dashboard() {
     }
   };
 
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const loadChartData = async (days: string) => {
+    try {
+      setChartLoading(true);
+      const startDate = new Date(Date.now() - parseInt(days) * 24 * 60 * 60 * 1000).toISOString();
+      const endDate = new Date().toISOString();
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001/api'}/admin/reports/sales?startDate=${startDate}&endDate=${endDate}&groupBy=day`, { headers: authHeaders });
+      if (response.ok) {
+        const data = await response.json();
+        setChartData((data.data || []).map((d: any) => ({
+          date: new Date(d.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+          sales: d.totalSales || 0,
+          transactions: d.totalTransactions || 0,
+        })));
+      }
+    } catch (error) {
+      console.error('Error loading chart:', error);
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
+  useEffect(() => { loadChartData(chartPeriod); }, [chartPeriod]);
+
+  const handleExport = () => {
+    if (chartData.length === 0) return;
+    const csv = ['วันที่,ยอดขาย,จำนวนรายการ', ...chartData.map(d => `${d.date},${d.sales},${d.transactions}`)].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jespark-report-${chartPeriod}days.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const loadRecentActivities = async () => {
     try {
@@ -75,7 +115,7 @@ export default function Dashboard() {
           <h1 className="text-2xl font-black text-slate-900">Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">ภาพรวมระบบ Jespark Rewards</p>
         </div>
-        <Button variant="outline" icon="download" size="sm">
+        <Button variant="outline" icon="download" size="sm" onClick={handleExport}>
           Export Report
         </Button>
       </div>
@@ -106,25 +146,54 @@ export default function Dashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Chart Placeholder */}
+        {/* Sales chart */}
         <Card title="ยอดขายรายเดือน" action={
-          <select className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20">
-            <option>7 วัน</option>
-            <option>30 วัน</option>
-            <option>90 วัน</option>
+          <select
+            className="text-xs border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20"
+            value={chartPeriod}
+            onChange={(e) => setChartPeriod(e.target.value)}
+          >
+            <option value="7">7 วัน</option>
+            <option value="30">30 วัน</option>
+            <option value="90">90 วัน</option>
           </select>
         }>
-          <div className="h-64 flex items-center justify-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
-            <div className="text-center">
-              <span className="material-symbols-outlined text-slate-300 text-4xl">bar_chart</span>
-              <p className="text-sm text-slate-400 mt-2">กราฟจะแสดงที่นี่</p>
+          {chartLoading ? (
+            <div className="h-64 flex flex-col items-center justify-center bg-slate-50 rounded-lg">
+              <span className="material-symbols-outlined text-primary text-4xl animate-spin">progress_activity</span>
+              <p className="text-sm text-slate-400 mt-2">กำลังโหลดข้อมูล...</p>
             </div>
-          </div>
+          ) : chartData.length === 0 ? (
+            <div className="h-64 flex items-center justify-center bg-slate-50 rounded-lg">
+              <p className="text-sm text-slate-400">ยังไม่มีข้อมูล</p>
+            </div>
+          ) : (
+            <div className="h-64 w-full min-h-[256px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="date" stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                  <YAxis stroke="#94a3b8" fontSize={11} tickLine={false} axisLine={{ stroke: '#e2e8f0' }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: '#fff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                      fontSize: '12px',
+                    }}
+                    formatter={(value: number) => [value.toLocaleString('th-TH'), 'ยอดขาย']}
+                  />
+                  <Bar dataKey="sales" fill="#003399" radius={[4, 4, 0, 0]} name="ยอดขาย" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </Card>
 
         {/* Recent Activities */}
         <Card title="กิจกรรมล่าสุด" action={
-          <Button variant="ghost" size="sm">ดูทั้งหมด</Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>ดูทั้งหมด</Button>
         }>
           <div className="space-y-1">
             {recentActivities.length === 0 ? (

@@ -76,6 +76,115 @@ export default function Reports() {
 
   const tooltipStyle = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)', fontSize: '12px' };
 
+  const handleExportCSV = () => {
+    let csv = '';
+    let filename = '';
+
+    if (activeTab === 'sales' && salesData) {
+      csv = 'วันที่,ยอดขาย,จำนวนรายการ,คะแนนที่แจก\n';
+      csv += (salesData.data || []).map((d: any) =>
+        `${d.date},${d.totalSales},${d.totalTransactions},${d.totalPoints}`
+      ).join('\n');
+      filename = 'jespark-sales-report';
+    } else if (activeTab === 'members' && membersData) {
+      csv = 'วันที่,สมาชิกใหม่\n';
+      csv += (membersData.data || []).map((d: any) =>
+        `${d.date},${d.newMembers}`
+      ).join('\n');
+      filename = 'jespark-members-report';
+    } else if (activeTab === 'points' && pointsData) {
+      csv = 'ชื่อ,อีเมล,คะแนน\n';
+      csv += (pointsData.topCustomers || []).map((c: any) =>
+        `${c.name},${c.email},${c.points}`
+      ).join('\n');
+      filename = 'jespark-points-report';
+    } else if (activeTab === 'redemptions' && redemptionsData) {
+      csv = 'ของรางวัล,จำนวนการแลก\n';
+      csv += (redemptionsData.popularRewards || []).map((r: any) =>
+        `${r.name},${r.count}`
+      ).join('\n');
+      filename = 'jespark-redemptions-report';
+    } else {
+      alert('ยังไม่มีข้อมูลสำหรับส่งออก หรือกำลังโหลดอยู่');
+      return;
+    }
+
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}-${dateRange}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportPDF = () => {
+    let title = '';
+    let tableHTML = '';
+
+    if (activeTab === 'sales' && salesData?.summary) {
+      title = 'รายงานยอดขาย';
+      const s = salesData.summary;
+      tableHTML = `
+      <div style="margin-bottom:20px;">
+        <p><strong>ยอดขายรวม:</strong> ฿${Number(s.totalSales ?? 0).toLocaleString()}</p>
+        <p><strong>จำนวนรายการ:</strong> ${Number(s.totalTransactions ?? 0).toLocaleString()}</p>
+        <p><strong>คะแนนที่แจก:</strong> ${Number(s.totalPoints ?? 0).toLocaleString()}</p>
+      </div>
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px;">
+        <thead><tr style="background:#003399;color:#fff;"><th>วันที่</th><th>ยอดขาย</th><th>รายการ</th><th>คะแนน</th></tr></thead>
+        <tbody>${(salesData.data || []).map((d: any) => `<tr><td>${d.date ?? ''}</td><td style="text-align:right">฿${Number(d.totalSales ?? 0).toLocaleString()}</td><td style="text-align:right">${d.totalTransactions ?? ''}</td><td style="text-align:right">${d.totalPoints ?? ''}</td></tr>`).join('')}</tbody>
+      </table>`;
+    } else if (activeTab === 'members' && membersData?.summary) {
+      title = 'รายงานสมาชิก';
+      tableHTML = `
+      <div style="margin-bottom:20px;">
+        <p><strong>สมาชิกใหม่:</strong> ${membersData.summary.totalNewMembers ?? ''}</p>
+      </div>
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px;">
+        <thead><tr style="background:#003399;color:#fff;"><th>วันที่</th><th>สมาชิกใหม่</th></tr></thead>
+        <tbody>${(membersData.data || []).map((d: any) => `<tr><td>${d.date ?? ''}</td><td style="text-align:right">${d.newMembers ?? ''}</td></tr>`).join('')}</tbody>
+      </table>`;
+    } else if (activeTab === 'points' && pointsData?.summary) {
+      title = 'รายงานคะแนน';
+      const ps = pointsData.summary;
+      tableHTML = `
+      <div style="margin-bottom:20px;">
+        <p><strong>คะแนนที่แจก:</strong> +${Number(ps.totalPointsGiven ?? 0).toLocaleString()}</p>
+        <p><strong>คะแนนที่ใช้:</strong> -${Number(ps.totalPointsUsed ?? 0).toLocaleString()}</p>
+        <p><strong>คะแนนสุทธิ:</strong> ${Number(ps.netPoints ?? 0).toLocaleString()}</p>
+      </div>
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px;">
+        <thead><tr style="background:#003399;color:#fff;"><th>อันดับ</th><th>ชื่อ</th><th>อีเมล</th><th>คะแนน</th></tr></thead>
+        <tbody>${(pointsData.topCustomers || []).map((c: any, i: number) => `<tr><td>${i + 1}</td><td>${c.name ?? ''}</td><td>${c.email ?? ''}</td><td style="text-align:right">${Number(c.points ?? 0).toLocaleString()}</td></tr>`).join('')}</tbody>
+      </table>`;
+    } else if (activeTab === 'redemptions' && redemptionsData?.summary) {
+      title = 'รายงานการแลกของรางวัล';
+      const rs = redemptionsData.summary;
+      tableHTML = `
+      <div style="margin-bottom:20px;">
+        <p><strong>จำนวนการแลก:</strong> ${Number(rs.totalRedemptions ?? 0).toLocaleString()}</p>
+        <p><strong>คะแนนที่ใช้:</strong> ${Number(rs.totalPointsUsed ?? 0).toLocaleString()}</p>
+      </div>
+      <table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;width:100%;font-size:14px;">
+        <thead><tr style="background:#003399;color:#fff;"><th>ของรางวัล</th><th>จำนวนการแลก</th></tr></thead>
+        <tbody>${(redemptionsData.popularRewards || []).map((r: any) => `<tr><td>${r.name ?? ''}</td><td style="text-align:right">${r.count ?? ''}</td></tr>`).join('')}</tbody>
+      </table>`;
+    } else {
+      alert('ยังไม่มีข้อมูลสำหรับส่งออก หรือกำลังโหลดอยู่');
+      return;
+    }
+
+    const dateLabel = dateRange === '7days' ? '7 วัน' : dateRange === '30days' ? '30 วัน' : '90 วัน';
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('ไม่สามารถเปิดหน้าต่างพิมพ์ได้ กรุณาอนุญาตป๊อปอัป');
+      return;
+    }
+    printWindow.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title} - Jespark</title><style>body{font-family:'Sarabun',sans-serif;padding:40px;color:#333;}h1{color:#003399;margin-bottom:5px;}h3{color:#666;font-weight:normal;margin-top:0;}@media print{body{padding:20px;}}</style></head><body><h1>Jespark - ${title}</h1><h3>ช่วงเวลา: ${dateLabel} | สร้างเมื่อ: ${new Date().toLocaleDateString('th-TH')}</h3>${tableHTML}<script>setTimeout(function(){window.print();},500);<\/script></body></html>`);
+    printWindow.document.close();
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -85,8 +194,8 @@ export default function Reports() {
           <p className="text-sm text-slate-500 mt-0.5">วิเคราะห์ข้อมูลยอดขาย สมาชิก และคะแนน</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" icon="picture_as_pdf" size="sm" onClick={() => alert('Export PDF - Coming soon!')}>PDF</Button>
-          <Button variant="outline" icon="table_chart" size="sm" onClick={() => alert('Export Excel - Coming soon!')}>Excel</Button>
+          <Button variant="outline" icon="picture_as_pdf" size="sm" onClick={handleExportPDF}>PDF</Button>
+          <Button variant="outline" icon="table_chart" size="sm" onClick={handleExportCSV}>CSV</Button>
         </div>
       </div>
 

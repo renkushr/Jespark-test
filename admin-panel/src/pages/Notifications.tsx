@@ -14,17 +14,26 @@ export default function Notifications() {
   const [sending, setSending] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   const token = localStorage.getItem('admin_token');
   const authHeaders: HeadersInit = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
 
-  useEffect(() => { loadNotifications(); }, []);
+  useEffect(() => { loadNotifications(); }, [page]);
 
   const loadNotifications = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/notifications?limit=100`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (res.ok) { const data = await res.json(); setNotifications(data.notifications || []); }
+      const offset = (page - 1) * PAGE_SIZE;
+      const res = await fetch(`${API_BASE}/admin/notifications?limit=${PAGE_SIZE}&offset=${offset}`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.notifications || [];
+        setNotifications(list);
+        setTotalCount(data.total ?? data.pagination?.total ?? list.length);
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -95,7 +104,7 @@ export default function Notifications() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
-          { label: 'ทั้งหมด', value: notifications.length, icon: 'notifications', color: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
+          { label: 'ทั้งหมด', value: totalCount, icon: 'notifications', color: 'border-l-primary', iconBg: 'bg-primary-50 text-primary' },
           { label: 'ยังไม่อ่าน', value: notifications.filter(n => !n.is_read).length, icon: 'mark_email_unread', color: 'border-l-warning', iconBg: 'bg-amber-50 text-warning' },
           { label: 'อ่านแล้ว', value: notifications.filter(n => n.is_read).length, icon: 'mark_email_read', color: 'border-l-success', iconBg: 'bg-emerald-50 text-success' },
           { label: 'วันนี้', value: notifications.filter(n => new Date(n.created_at).toDateString() === new Date().toDateString()).length, icon: 'today', color: 'border-l-sky-400', iconBg: 'bg-sky-50 text-sky-500' },
@@ -124,37 +133,67 @@ export default function Notifications() {
               <p className="text-sm text-slate-400 mt-3">ไม่มีการแจ้งเตือน</p>
             </div>
           ) : (
-            <div className="divide-y divide-slate-50">
-              {notifications.map((n) => (
-                <div key={n.id} className={`flex items-start gap-4 p-4 hover:bg-slate-50/50 transition-colors ${!n.is_read ? 'bg-primary-50/30' : ''}`}>
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
-                    n.type === 'success' ? 'bg-emerald-50' : n.type === 'warning' ? 'bg-amber-50' : n.type === 'error' ? 'bg-red-50' : 'bg-sky-50'
-                  }`}>
-                    <span className={`material-symbols-outlined text-[18px] ${
-                      n.type === 'success' ? 'text-success' : n.type === 'warning' ? 'text-warning' : n.type === 'error' ? 'text-danger' : 'text-sky-500'
+            <>
+              <div className="divide-y divide-slate-50">
+                {notifications.map((n) => (
+                  <div key={n.id} className={`flex items-start gap-4 p-4 hover:bg-slate-50/50 transition-colors ${!n.is_read ? 'bg-primary-50/30' : ''}`}>
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                      n.type === 'success' ? 'bg-emerald-50' : n.type === 'warning' ? 'bg-amber-50' : n.type === 'error' ? 'bg-red-50' : 'bg-sky-50'
                     }`}>
-                      {n.type === 'success' ? 'check_circle' : n.type === 'warning' ? 'warning' : n.type === 'error' ? 'error' : 'info'}
+                      <span className={`material-symbols-outlined text-[18px] ${
+                        n.type === 'success' ? 'text-success' : n.type === 'warning' ? 'text-warning' : n.type === 'error' ? 'text-danger' : 'text-sky-500'
+                      }`}>
+                        {n.type === 'success' ? 'check_circle' : n.type === 'warning' ? 'warning' : n.type === 'error' ? 'error' : 'info'}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-slate-800 text-sm">{n.title}</p>
+                        {getTypeBadge(n.type)}
+                        {!n.is_read && <span className="w-2 h-2 bg-primary rounded-full"></span>}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
+                      <div className="flex items-center gap-3 mt-1.5">
+                        <span className="text-[10px] text-slate-400">{n.user?.name || `User #${n.user_id}`}</span>
+                        <span className="text-[10px] text-slate-300">·</span>
+                        <span className="text-[10px] text-slate-400">{n.created_at ? new Date(n.created_at).toLocaleString('th-TH') : '-'}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => handleDelete(n.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors shrink-0" title="ลบ">
+                      <span className="material-symbols-outlined text-slate-400 hover:text-danger text-[18px]">delete</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
+                  <p className="text-xs text-slate-500">
+                    แสดง {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}-{Math.min(page * PAGE_SIZE, totalCount)} จาก {totalCount} รายการ
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ก่อนหน้า
+                    </button>
+                    <span className="px-3 py-1.5 text-xs font-bold text-slate-600">
+                      หน้า {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => setPage(p => p + 1)}
+                      disabled={page * PAGE_SIZE >= totalCount}
+                      className="px-3 py-1.5 text-xs font-bold rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50"
+                    >
+                      ถัดไป
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-bold text-slate-800 text-sm">{n.title}</p>
-                      {getTypeBadge(n.type)}
-                      {!n.is_read && <span className="w-2 h-2 bg-primary rounded-full"></span>}
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{n.message}</p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[10px] text-slate-400">{n.user?.name || `User #${n.user_id}`}</span>
-                      <span className="text-[10px] text-slate-300">·</span>
-                      <span className="text-[10px] text-slate-400">{n.created_at ? new Date(n.created_at).toLocaleString('th-TH') : '-'}</span>
-                    </div>
-                  </div>
-                  <button onClick={() => handleDelete(n.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition-colors shrink-0" title="ลบ">
-                    <span className="material-symbols-outlined text-slate-400 hover:text-danger text-[18px]">delete</span>
-                  </button>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </Card>
       )}
